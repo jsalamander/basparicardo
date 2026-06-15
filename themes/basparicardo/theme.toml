@@ -1,0 +1,6 @@
+name = "basparicardo"
+license = "MIT"
+licenselink = "https://opensource.org/licenses/MIT"
+description = "A plain Hugo theme built with Tailwind utility classes only."
+homepage = "https://basparicardo.ch/"
+min_version = "0.149.0"
