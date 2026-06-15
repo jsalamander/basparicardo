@@ -1,0 +1,27 @@
+{
+  "name": "basparicardo",
+  "version": "1.0.0",
+  "description": "Website basparicardo.ch",
+  "scripts": {
+    "build:css": "mkdir -p ./static/css && tailwindcss -i ./assets/css/main.css -o ./static/css/main.css --minify",
+    "build:hugo": "hugo --gc --minify",
+    "build": "npm run build:css && npm run build:hugo",
+    "dev:css": "mkdir -p ./static/css && tailwindcss -i ./assets/css/main.css -o ./static/css/main.css --watch",
+    "dev:hugo": "hugo server --disableFastRender",
+    "dev": "sh -c 'trap \"kill 0\" EXIT; npm run dev:css & npm run dev:hugo'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jsalamander/basparicardo.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jsalamander/basparicardo/issues"
+  },
+  "homepage": "https://github.com/jsalamander/basparicardo#readme",
+  "devDependencies": {
+    "tailwindcss": "^3.4.19"
+  }
+}

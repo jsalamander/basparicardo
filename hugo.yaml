@@ -1,0 +1,9 @@
+baseURL: https://basparicardo.ch/
+languageCode: en
+title: Basparicardo
+theme: basparicardo
+disableKinds:
+  - taxonomy
+  - term
+params:
+  tagline: Simple living, with a plain Hugo and Tailwind setup.
