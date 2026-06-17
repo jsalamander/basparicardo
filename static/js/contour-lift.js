@@ -15,6 +15,8 @@
       return;
     }
 
+    const scrollContainers = Array.from(surface.querySelectorAll("[data-contour-scroll]"));
+
     const paths = Array.from(svg.querySelectorAll("path"));
     if (paths.length === 0) {
       return;
@@ -415,22 +417,26 @@
       { passive: true }
     );
 
-    window.addEventListener(
-      "scroll",
-      () => {
-        needsRecalc = true;
+    const handleScroll = () => {
+      needsRecalc = true;
 
-        if (state.pointerType === "touch" || state.touchActive) {
-          state.scrollLockUntil = performance.now() + touchScrollCooldownMs;
-          state.suppressUntilPointerUp = true;
-          state.touchInertiaActive = false;
-          state.touchVelocityX = 0;
-          state.touchVelocityY = 0;
-          clearActivePoint();
-        }
-      },
-      { passive: true }
-    );
+      if (state.pointerType === "touch" || state.touchActive) {
+        state.scrollLockUntil = performance.now() + touchScrollCooldownMs;
+        state.suppressUntilPointerUp = true;
+        state.touchInertiaActive = false;
+        state.touchVelocityX = 0;
+        state.touchVelocityY = 0;
+        clearActivePoint();
+      }
+    };
+
+    if (scrollContainers.length > 0) {
+      for (const container of scrollContainers) {
+        container.addEventListener("scroll", handleScroll, { passive: true });
+      }
+    } else {
+      window.addEventListener("scroll", handleScroll, { passive: true });
+    }
 
     scheduleRender();
   }

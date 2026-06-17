@@ -7,7 +7,11 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        body: ['"Bebas Neue"', 'sans-serif'],
+        "display-oswald": ['"Oswald"', 'sans-serif'],
+        "display-anton": ['"Anton"', 'sans-serif'],
+        "display-barlow": ['"Barlow Condensed"', 'sans-serif'],
+        "ui-sora": ['"Sora"', 'system-ui', 'sans-serif'],
+        "ui-manrope": ['"Manrope"', 'system-ui', 'sans-serif'],
       },
     },
   },

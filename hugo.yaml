@@ -7,3 +7,4 @@ disableKinds:
   - term
 params:
   tagline: Simple living, with a plain Hugo and Tailwind setup.
+  fontPair: barlow-manrope

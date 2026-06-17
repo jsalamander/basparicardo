@@ -1,33 +1,37 @@
-<section class="relative isolate flex min-h-screen touch-pan-y touch-manipulation items-start overflow-hidden bg-black select-none" data-contour-surface>
+{{ $fontPair := site.Params.fontPair | default "oswald-sora" }}
+{{ $isAntonPair := eq $fontPair "anton-manrope" }}
+{{ $isBarlowPair := eq $fontPair "barlow-manrope" }}
+{{ $displayClass := cond $isAntonPair "font-display-anton tracking-[0.06em]" (cond $isBarlowPair "font-display-barlow tracking-[0.08em]" "font-display-oswald tracking-[0.1em]") }}
+{{ $uiClass := cond (or $isAntonPair $isBarlowPair) "font-ui-manrope" "font-ui-sora" }}
 
-  {{ partial "contour-background.html" . }}
+<section class="relative isolate flex min-h-screen touch-pan-y touch-manipulation items-start overflow-hidden select-none">
 
   <div class="relative z-20 mx-auto w-full max-w-6xl px-6 py-14 sm:px-10 md:py-20">
     <header class="mx-auto flex max-w-3xl justify-center">
       <img
-        class="h-auto w-full max-w-[28rem]"
+        class="h-auto w-full"
         src="{{ `image/Logo_Baspa_Schrift_end.svg` | relURL }}"
         alt="{{ .Title }}"
       >
     </header>
 
     <div class="mx-auto mt-8 max-w-4xl text-center sm:mt-10 md:mt-12">
-      <h1 class="text-5xl uppercase tracking-[0.18em] text-[#fbf4c2] sm:text-6xl md:text-7xl">
+      <h1 class="{{ $displayClass }} text-5xl uppercase leading-[0.95] text-[#fbf4c2] sm:text-6xl md:text-7xl">
         {{ .Params.showsTitle | default "Shows" }}
       </h1>
     </div>
 
-    <div class="mx-auto mt-8 max-w-5xl sm:mt-10 md:mt-14">
+    <div class="mx-auto mt-8 max-w-5xl {{ $uiClass }} sm:mt-10 md:mt-14">
       <ul class="space-y-4 sm:space-y-5 md:space-y-6">
         {{ $now := now }}
         {{ $upcoming := where .Params.events "date" "ge" ($now.Format "2006-01-02") }}
         {{ range sort $upcoming "date" "asc" }}
           {{ $title := .title | default .name }}
-          <li class="grid grid-cols-1 gap-2 pb-3 text-[#fbf4c2] sm:grid-cols-2 sm:gap-8 sm:pb-4">
-            <p class="text-center text-4xl uppercase leading-none tracking-[0.08em] sm:text-left sm:text-5xl md:text-6xl">{{ dateFormat "2 January 2006" .date }}</p>
-            <p class="text-center text-4xl uppercase leading-none tracking-[0.08em] sm:text-right sm:text-5xl md:text-6xl">
+          <li class="grid grid-cols-1 items-end gap-1 pb-3 text-[#fbf4c2] sm:grid-cols-2 sm:gap-8 sm:pb-4">
+            <p class="text-center text-[clamp(1.25rem,3.8vw,2.3rem)] font-medium leading-tight tracking-[0.03em] [font-variant-numeric:tabular-nums] sm:text-left">{{ dateFormat "2 January 2006" .date }}</p>
+            <p class="text-center text-[clamp(1.55rem,5.2vw,3.1rem)] font-semibold leading-[0.96] tracking-[0.015em] sm:text-right">
               {{ if .url }}
-                <a href="{{ .url }}" target="_blank" rel="noopener noreferrer" class="underline decoration-[#fbf4c2]/40 underline-offset-4 hover:decoration-[#fbf4c2]">{{ $title }}</a>
+                <a href="{{ .url }}" target="_blank" rel="noopener noreferrer" class="underline decoration-[#fbf4c2]/45 underline-offset-[0.22em] transition-colors hover:decoration-[#fbf4c2]">{{ $title }}</a>
               {{ else }}
                 {{ $title }}
               {{ end }}
