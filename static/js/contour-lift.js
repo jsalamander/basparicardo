@@ -22,21 +22,30 @@
 
     const coarsePointer =
       window.matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
-    const maxLift = coarsePointer ? 5 : 8;
+    const maxLift = coarsePointer ? 5 : 7;
     const radiusScale = coarsePointer ? 0.65 : 0.5;
     const baseOpacity = 0.36;
     const peakOpacity = 0.9;
     const maxSamplesPerPath = coarsePointer ? 34 : 42;
+    const transformDuration = coarsePointer ? 0.4 : 0.55;
+    const opacityDuration = coarsePointer ? 0.45 : 0.6;
+    const mouseSmoothing = 0.18;
 
     let needsRecalc = true;
     let sampledPoints = [];
 
     const setters = paths.map((path) => ({
-      y: window.gsap.quickTo(path, "y", { duration: 0.25, ease: "power2.out" }),
-      scaleX: window.gsap.quickTo(path, "scaleX", { duration: 0.25, ease: "power2.out" }),
-      scaleY: window.gsap.quickTo(path, "scaleY", { duration: 0.25, ease: "power2.out" }),
+      y: window.gsap.quickTo(path, "y", { duration: transformDuration, ease: "power2.out" }),
+      scaleX: window.gsap.quickTo(path, "scaleX", {
+        duration: transformDuration,
+        ease: "power2.out",
+      }),
+      scaleY: window.gsap.quickTo(path, "scaleY", {
+        duration: transformDuration,
+        ease: "power2.out",
+      }),
       opacity: window.gsap.quickTo(path, "strokeOpacity", {
-        duration: 0.3,
+        duration: opacityDuration,
         ease: "power2.out",
       }),
     }));
@@ -95,6 +104,15 @@
       x: 0,
       y: 0,
       frameQueued: false,
+      pointerType: "",
+      startX: 0,
+      startY: 0,
+      suppressUntilPointerUp: false,
+      targetX: 0,
+      targetY: 0,
+      currentX: 0,
+      currentY: 0,
+      hasCurrentPoint: false,
     };
 
     function render() {
@@ -109,6 +127,18 @@
         return;
       }
 
+      const pointerType = state.pointerType || "mouse";
+      const smoothing = pointerType === "mouse" ? mouseSmoothing : 1;
+
+      if (!state.hasCurrentPoint) {
+        state.currentX = state.targetX;
+        state.currentY = state.targetY;
+        state.hasCurrentPoint = true;
+      } else {
+        state.currentX += (state.targetX - state.currentX) * smoothing;
+        state.currentY += (state.targetY - state.currentY) * smoothing;
+      }
+
       const svgRect = svg.getBoundingClientRect();
       const radius = Math.max(120, Math.min(svgRect.width, svgRect.height) * radiusScale);
 
@@ -118,8 +148,8 @@
         let distance = Number.POSITIVE_INFINITY;
 
         for (const point of points) {
-          const dx = state.x - point.x;
-          const dy = state.y - point.y;
+          const dx = state.currentX - point.x;
+          const dy = state.currentY - point.y;
           const nextDistance = Math.hypot(dx, dy);
 
           if (nextDistance < distance) {
@@ -136,6 +166,14 @@
         set.scaleY(scale);
         set.opacity(baseOpacity + (peakOpacity - baseOpacity) * eased);
       }
+
+      if (pointerType === "mouse") {
+        const remaining = Math.hypot(state.targetX - state.currentX, state.targetY - state.currentY);
+
+        if (remaining > 0.4) {
+          scheduleRender();
+        }
+      }
     }
 
     function scheduleRender() {
@@ -149,39 +187,67 @@
 
     function setActivePoint(x, y) {
       state.active = true;
-      state.x = x;
-      state.y = y;
+      state.targetX = x;
+      state.targetY = y;
+
+      if (!state.hasCurrentPoint) {
+        state.currentX = x;
+        state.currentY = y;
+        state.hasCurrentPoint = true;
+      }
+
       scheduleRender();
     }
 
     function clearActivePoint() {
       state.active = false;
+      state.hasCurrentPoint = false;
       scheduleRender();
     }
 
     function onPointerMove(event) {
+      if (!state.pointerType) {
+        state.pointerType = event.pointerType || "mouse";
+      }
+
+      if (state.pointerType === "touch") {
+        const dx = event.clientX - state.startX;
+        const dy = event.clientY - state.startY;
+        const verticalScrollIntent = Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx) * 1.2;
+
+        if (verticalScrollIntent) {
+          state.suppressUntilPointerUp = true;
+          clearActivePoint();
+          return;
+        }
+
+        if (state.suppressUntilPointerUp) {
+          return;
+        }
+      }
+
       setActivePoint(event.clientX, event.clientY);
     }
 
-    function onTouchMove(event) {
-      if (event.touches.length === 0) {
-        return;
-      }
+    function onPointerDown(event) {
+      state.pointerType = event.pointerType || "";
+      state.startX = event.clientX;
+      state.startY = event.clientY;
+      state.suppressUntilPointerUp = false;
+      setActivePoint(event.clientX, event.clientY);
+    }
 
-      const touch = event.touches[0];
-      setActivePoint(touch.clientX, touch.clientY);
+    function onPointerEnd() {
+      state.suppressUntilPointerUp = false;
+      state.pointerType = "";
+      clearActivePoint();
     }
 
     surface.addEventListener("pointermove", onPointerMove, { passive: true });
-    surface.addEventListener("pointerdown", onPointerMove, { passive: true });
-    surface.addEventListener("pointerleave", clearActivePoint, { passive: true });
-    surface.addEventListener("pointercancel", clearActivePoint, { passive: true });
-    surface.addEventListener("pointerup", clearActivePoint, { passive: true });
-
-    surface.addEventListener("touchstart", onTouchMove, { passive: true });
-    surface.addEventListener("touchmove", onTouchMove, { passive: true });
-    surface.addEventListener("touchend", clearActivePoint, { passive: true });
-    surface.addEventListener("touchcancel", clearActivePoint, { passive: true });
+    surface.addEventListener("pointerdown", onPointerDown, { passive: true });
+    surface.addEventListener("pointerleave", onPointerEnd, { passive: true });
+    surface.addEventListener("pointercancel", onPointerEnd, { passive: true });
+    surface.addEventListener("pointerup", onPointerEnd, { passive: true });
 
     window.addEventListener(
       "resize",
