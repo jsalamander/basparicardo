@@ -24,9 +24,12 @@
 
     const coarsePointer =
       window.matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
-    const maxLift = coarsePointer ? 5 : 6.2;
-    const radiusScale = coarsePointer ? 0.85 : 0.62;
-    const baseOpacity = 0.42;
+    const maxLift = coarsePointer ? 6 : 7.4;
+    const radiusScale = coarsePointer ? 0.92 : 0.7;
+    const baseOpacity = 0.48;
+    const contactPulseColor = "#F79628";
+    const contactPulseDuration = coarsePointer ? 0.9 : 0.8;
+    const contactPulseWidthBoost = coarsePointer ? 0.9 : 1.1;
     const maxSamplesPerPath = coarsePointer ? 34 : 42;
     const mouseSmoothing = 0.11;
     const touchSmoothing = 0.12;
@@ -34,10 +37,11 @@
     const mouseMoveEpsilon = 1.2;
     const touchMoveEpsilon = 1.6;
     const touchMoveThrottleMs = 16;
-    const lineResponse = coarsePointer ? 0.085 : 0.105;
-    const touchInertiaDecay = 0.9;
+    const lineResponse = coarsePointer ? 0.11 : 0.13;
+    const touchInertiaDecay = 0.93;
     const touchInertiaMinSpeed = 70;
-    const touchInertiaMaxMs = 320;
+    const touchInertiaMaxMs = 420;
+    const pulseDebounceMs = coarsePointer ? 800 : 300;
 
     let needsRecalc = true;
     let sampledPoints = [];
@@ -49,6 +53,35 @@
     const lineState = paths.map(() => ({
       y: 0,
     }));
+
+    const originalStrokeColors = paths.map((path) => {
+      const strokeAttr = path.getAttribute("stroke");
+      if (strokeAttr) {
+        return strokeAttr;
+      }
+
+      const computedStroke = getComputedStyle(path).stroke;
+      if (computedStroke && computedStroke !== "none") {
+        return computedStroke;
+      }
+
+      return "#fffed5";
+    });
+
+    const originalStrokeWidths = paths.map((path) => {
+      const attrWidth = Number.parseFloat(path.getAttribute("stroke-width") || "");
+      const computedWidth = Number.parseFloat(getComputedStyle(path).strokeWidth || "");
+
+      if (Number.isFinite(attrWidth)) {
+        return attrWidth;
+      }
+
+      if (Number.isFinite(computedWidth)) {
+        return computedWidth;
+      }
+
+      return 0.9;
+    });
 
     window.gsap.set(paths, {
       transformBox: "fill-box",
@@ -128,6 +161,52 @@
       needsRecalc = false;
     }
 
+    function pulseNearestLine(x, y) {
+      if (needsRecalc) {
+        cacheSampledPoints();
+      }
+
+      let nearestIndex = -1;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+
+      for (let index = 0; index < sampledPoints.length; index += 1) {
+        const points = sampledPoints[index];
+        const distance = distanceToPolyline(points, x, y);
+
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestIndex = index;
+        }
+      }
+
+      if (nearestIndex < 0) {
+        return;
+      }
+
+      const path = paths[nearestIndex];
+      const originalStroke = originalStrokeColors[nearestIndex];
+      const originalWidth = originalStrokeWidths[nearestIndex];
+
+      // Only kill stroke-related tweens, not transform tweens
+      window.gsap.killTweensOf(path, "stroke,strokeOpacity,strokeWidth");
+      
+      window.gsap.set(path, {
+        stroke: contactPulseColor,
+        strokeOpacity: 1,
+        strokeWidth: originalWidth + contactPulseWidthBoost,
+      });
+      window.gsap.to(path, {
+        duration: contactPulseDuration,
+        ease: "power2.out",
+        stroke: originalStroke,
+        strokeOpacity: baseOpacity,
+        strokeWidth: originalWidth,
+        overwrite: "auto",
+      });
+
+      state.lastPulseTs = performance.now();
+    }
+
     function relaxPaths() {
       let settled = true;
 
@@ -136,6 +215,7 @@
         const stateItem = lineState[index];
 
         stateItem.y += (0 - stateItem.y) * lineResponse;
+
         if (Math.abs(stateItem.y) < 0.01) {
           stateItem.y = 0;
         }
@@ -175,6 +255,8 @@
       touchVelocityY: 0,
       touchInertiaActive: false,
       touchInertiaUntil: 0,
+      lastPulseTs: 0,
+      pointerDownTs: 0,
     };
 
     function render() {
@@ -317,7 +399,9 @@
           return;
         }
 
-        if (performance.now() < state.scrollLockUntil) {
+        // Allow updates for the first 100ms after pointer down, even if scroll locked
+        const timeSinceDown = performance.now() - state.pointerDownTs;
+        if (timeSinceDown > 100 && performance.now() < state.scrollLockUntil) {
           return;
         }
 
@@ -361,6 +445,7 @@
       if (state.pointerType === "touch") {
         state.touchActive = true;
         const now = performance.now();
+        state.pointerDownTs = now;
         state.lastTouchMoveTs = now;
         state.lastTouchEventTs = now;
         state.lastTouchX = event.clientX;
@@ -370,8 +455,16 @@
         state.touchInertiaActive = false;
         state.hasTouchTarget = false;
 
+        // Block pointer down during scroll lock to prevent race conditions
         if (now < state.scrollLockUntil) {
           return;
+        }
+        // No pulse on touch — just use the lift effect for feedback
+      } else {
+        // Mouse: pulse with debounce
+        const now = performance.now();
+        if (now - state.lastPulseTs >= pulseDebounceMs) {
+          pulseNearestLine(event.clientX, event.clientY);
         }
       }
 
@@ -426,7 +519,7 @@
         state.touchInertiaActive = false;
         state.touchVelocityX = 0;
         state.touchVelocityY = 0;
-        clearActivePoint();
+        // Don't clear the effect during scroll — let it relax naturally
       }
     };
 
