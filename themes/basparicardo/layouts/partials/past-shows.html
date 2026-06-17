@@ -1,0 +1,40 @@
+<section class="relative isolate flex min-h-screen items-center overflow-hidden bg-black">
+
+  <div class="absolute inset-0 -z-10 pointer-events-none" style="background-image: image-set(url('{{ `image/contours-1x.webp` | relURL }}') 1x, url('{{ `image/contours-2x.webp` | relURL }}') 2x); background-attachment: fixed; background-position: center; background-repeat: no-repeat; background-size: cover; opacity: 0.5;"></div>
+
+  <div class="relative z-20 mx-auto w-full max-w-6xl px-6 py-14 sm:px-10 md:py-20">
+    <header class="mx-auto flex max-w-3xl justify-center">
+      <img
+        class="h-auto w-full max-w-[28rem]"
+        src="{{ `image/Logo_Baspa_Schrift_end.svg` | relURL }}"
+        alt="{{ .Title }}"
+      >
+    </header>
+
+    <div class="mx-auto mt-8 max-w-4xl text-center sm:mt-10 md:mt-12">
+      <h1 class="text-5xl uppercase tracking-[0.18em] text-[#fbf4c2] sm:text-6xl md:text-7xl">
+        {{ .Title }}
+      </h1>
+    </div>
+
+    <div class="mx-auto mt-8 max-w-5xl sm:mt-10 md:mt-14">
+      <ul class="space-y-4 sm:space-y-5 md:space-y-6">
+        {{ $now := now }}
+        {{ $pastEvents := where .Site.Home.Params.events "date" "lt" ($now.Format "2006-01-02") }}
+        {{ range sort $pastEvents "date" "desc" }}
+          {{ $title := .title | default .name }}
+          <li class="grid grid-cols-1 gap-2 pb-3 text-[#fbf4c2] sm:grid-cols-2 sm:gap-8 sm:pb-4">
+            <p class="text-center text-4xl uppercase leading-none tracking-[0.08em] sm:text-left sm:text-5xl md:text-6xl">{{ dateFormat "2 January 2006" .date }}</p>
+            <p class="text-center text-4xl uppercase leading-none tracking-[0.08em] sm:text-right sm:text-5xl md:text-6xl">
+              {{ if .url }}
+                <a href="{{ .url }}" target="_blank" rel="noopener noreferrer" class="underline decoration-[#fbf4c2]/40 underline-offset-4 hover:decoration-[#fbf4c2]">{{ $title }}</a>
+              {{ else }}
+                {{ $title }}
+              {{ end }}
+            </p>
+          </li>
+        {{ end }}
+      </ul>
+    </div>
+  </div>
+</section>
