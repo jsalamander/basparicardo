@@ -22,33 +22,30 @@
 
     const coarsePointer =
       window.matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
-    const maxLift = coarsePointer ? 5 : 7;
-    const radiusScale = coarsePointer ? 0.65 : 0.5;
-    const baseOpacity = 0.36;
-    const peakOpacity = 0.9;
+    const maxLift = coarsePointer ? 5 : 6.2;
+    const radiusScale = coarsePointer ? 0.85 : 0.62;
+    const baseOpacity = 0.42;
     const maxSamplesPerPath = coarsePointer ? 34 : 42;
-    const transformDuration = coarsePointer ? 0.4 : 0.55;
-    const opacityDuration = coarsePointer ? 0.45 : 0.6;
-    const mouseSmoothing = 0.18;
+    const mouseSmoothing = 0.11;
+    const touchSmoothing = 0.12;
     const touchScrollCooldownMs = 320;
+    const mouseMoveEpsilon = 1.2;
+    const touchMoveEpsilon = 1.6;
+    const touchMoveThrottleMs = 16;
+    const lineResponse = coarsePointer ? 0.085 : 0.105;
+    const touchInertiaDecay = 0.9;
+    const touchInertiaMinSpeed = 70;
+    const touchInertiaMaxMs = 320;
 
     let needsRecalc = true;
     let sampledPoints = [];
 
     const setters = paths.map((path) => ({
-      y: window.gsap.quickTo(path, "y", { duration: transformDuration, ease: "power2.out" }),
-      scaleX: window.gsap.quickTo(path, "scaleX", {
-        duration: transformDuration,
-        ease: "power2.out",
-      }),
-      scaleY: window.gsap.quickTo(path, "scaleY", {
-        duration: transformDuration,
-        ease: "power2.out",
-      }),
-      opacity: window.gsap.quickTo(path, "strokeOpacity", {
-        duration: opacityDuration,
-        ease: "power2.out",
-      }),
+      y: window.gsap.quickSetter(path, "y"),
+    }));
+
+    const lineState = paths.map(() => ({
+      y: 0,
     }));
 
     window.gsap.set(paths, {
@@ -57,6 +54,44 @@
       strokeOpacity: baseOpacity,
       willChange: "transform,stroke-opacity",
     });
+
+    function distanceToSegment(px, py, ax, ay, bx, by) {
+      const abx = bx - ax;
+      const aby = by - ay;
+      const apx = px - ax;
+      const apy = py - ay;
+      const lengthSq = abx * abx + aby * aby;
+
+      if (lengthSq === 0) {
+        return Math.hypot(px - ax, py - ay);
+      }
+
+      const t = Math.max(0, Math.min(1, (apx * abx + apy * aby) / lengthSq));
+      const closestX = ax + abx * t;
+      const closestY = ay + aby * t;
+      return Math.hypot(px - closestX, py - closestY);
+    }
+
+    function distanceToPolyline(points, x, y) {
+      if (points.length < 2) {
+        const only = points[0];
+        return only ? Math.hypot(x - only.x, y - only.y) : Number.POSITIVE_INFINITY;
+      }
+
+      let minDistance = Number.POSITIVE_INFINITY;
+
+      for (let index = 1; index < points.length; index += 1) {
+        const prev = points[index - 1];
+        const current = points[index];
+        const distance = distanceToSegment(x, y, prev.x, prev.y, current.x, current.y);
+
+        if (distance < minDistance) {
+          minDistance = distance;
+        }
+      }
+
+      return minDistance;
+    }
 
     function cacheSampledPoints() {
       sampledPoints = paths.map((path) => {
@@ -92,12 +127,25 @@
     }
 
     function relaxPaths() {
-      for (const set of setters) {
-        set.y(0);
-        set.scaleX(1);
-        set.scaleY(1);
-        set.opacity(baseOpacity);
+      let settled = true;
+
+      for (let index = 0; index < setters.length; index += 1) {
+        const set = setters[index];
+        const stateItem = lineState[index];
+
+        stateItem.y += (0 - stateItem.y) * lineResponse;
+        if (Math.abs(stateItem.y) < 0.01) {
+          stateItem.y = 0;
+        }
+
+        if (stateItem.y !== 0) {
+          settled = false;
+        }
+
+        set.y(stateItem.y);
       }
+
+      return settled;
     }
 
     const state = {
@@ -114,24 +162,66 @@
       currentX: 0,
       currentY: 0,
       hasCurrentPoint: false,
+      hasTouchTarget: false,
       touchActive: false,
       scrollLockUntil: 0,
+      lastTouchMoveTs: 0,
+      lastTouchX: 0,
+      lastTouchY: 0,
+      lastTouchEventTs: 0,
+      touchVelocityX: 0,
+      touchVelocityY: 0,
+      touchInertiaActive: false,
+      touchInertiaUntil: 0,
     };
 
     function render() {
       state.frameQueued = false;
+      const now = performance.now();
 
       if (needsRecalc) {
         cacheSampledPoints();
       }
 
+      if (state.touchInertiaActive) {
+        if (now >= state.touchInertiaUntil) {
+          state.touchInertiaActive = false;
+          state.touchVelocityX = 0;
+          state.touchVelocityY = 0;
+          clearActivePoint();
+        } else {
+          const svgRect = svg.getBoundingClientRect();
+          state.touchVelocityX *= touchInertiaDecay;
+          state.touchVelocityY *= touchInertiaDecay;
+
+          const inertiaSpeed = Math.hypot(state.touchVelocityX, state.touchVelocityY);
+          if (inertiaSpeed < touchInertiaMinSpeed * 0.35) {
+            state.touchInertiaActive = false;
+            clearActivePoint();
+          } else {
+            const nextX = Math.min(
+              svgRect.right,
+              Math.max(svgRect.left, state.targetX + state.touchVelocityX / 60)
+            );
+            const nextY = Math.min(
+              svgRect.bottom,
+              Math.max(svgRect.top, state.targetY + state.touchVelocityY / 60)
+            );
+            setActivePoint(nextX, nextY, true);
+          }
+        }
+      }
+
       if (!state.active) {
-        relaxPaths();
+        const settled = relaxPaths();
+        if (!settled) {
+          scheduleRender();
+        }
         return;
       }
 
       const pointerType = state.pointerType || "mouse";
-      const smoothing = pointerType === "mouse" ? mouseSmoothing : 1;
+      const smoothing = pointerType === "mouse" ? mouseSmoothing : touchSmoothing;
 
       if (!state.hasCurrentPoint) {
         state.currentX = state.targetX;
@@ -145,37 +235,30 @@
       const svgRect = svg.getBoundingClientRect();
       const radius = Math.max(120, Math.min(svgRect.width, svgRect.height) * radiusScale);
 
+      let needsAnotherFrame = false;
+
       for (let index = 0; index < setters.length; index += 1) {
         const set = setters[index];
         const points = sampledPoints[index];
-        let distance = Number.POSITIVE_INFINITY;
-
-        for (const point of points) {
-          const dx = state.currentX - point.x;
-          const dy = state.currentY - point.y;
-          const nextDistance = Math.hypot(dx, dy);
-
-          if (nextDistance < distance) {
-            distance = nextDistance;
-          }
-        }
+        const distance = distanceToPolyline(points, state.currentX, state.currentY);
 
         const strength = Math.max(0, 1 - distance / radius);
         const eased = strength * strength * (2 - strength);
-        const scale = 1 + 0.03 * eased;
+        const stateItem = lineState[index];
+        const targetY = -maxLift * eased;
 
-        set.y(-maxLift * eased);
-        set.scaleX(scale);
-        set.scaleY(scale);
-        set.opacity(baseOpacity + (peakOpacity - baseOpacity) * eased);
+        stateItem.y += (targetY - stateItem.y) * lineResponse;
+
+        if (Math.abs(targetY - stateItem.y) > 0.015) {
+          needsAnotherFrame = true;
+        }
+
+        set.y(stateItem.y);
       }
 
-      if (pointerType === "mouse") {
-        const remaining = Math.hypot(state.targetX - state.currentX, state.targetY - state.currentY);
-
-        if (remaining > 0.4) {
-          scheduleRender();
-        }
+      const remaining = Math.hypot(state.targetX - state.currentX, state.targetY - state.currentY);
+      if (remaining > 0.25 || needsAnotherFrame) {
+        scheduleRender();
       }
     }
 
@@ -188,10 +271,23 @@
       requestAnimationFrame(render);
     }
 
-    function setActivePoint(x, y) {
+    function setActivePoint(x, y, force = false) {
       state.active = true;
+
+      if (!force && state.hasCurrentPoint) {
+        const jitter = Math.hypot(x - state.targetX, y - state.targetY);
+        const epsilon = state.pointerType === "touch" ? touchMoveEpsilon : mouseMoveEpsilon;
+
+        if (jitter < epsilon) {
+          return;
+        }
+      }
+
       state.targetX = x;
       state.targetY = y;
+      if (state.pointerType === "touch") {
+        state.hasTouchTarget = true;
+      }
 
       if (!state.hasCurrentPoint) {
         state.currentX = x;
@@ -205,6 +301,7 @@
     function clearActivePoint() {
       state.active = false;
       state.hasCurrentPoint = false;
+      state.hasTouchTarget = false;
       scheduleRender();
     }
 
@@ -235,6 +332,19 @@
         if (state.suppressUntilPointerUp) {
           return;
         }
+
+        const now = performance.now();
+        if (now - state.lastTouchMoveTs < touchMoveThrottleMs) {
+          return;
+        }
+        state.lastTouchMoveTs = now;
+
+        const dt = Math.max(1, now - state.lastTouchEventTs);
+        state.touchVelocityX = ((event.clientX - state.lastTouchX) / dt) * 1000;
+        state.touchVelocityY = ((event.clientY - state.lastTouchY) / dt) * 1000;
+        state.lastTouchX = event.clientX;
+        state.lastTouchY = event.clientY;
+        state.lastTouchEventTs = now;
       }
 
       setActivePoint(event.clientX, event.clientY);
@@ -248,18 +358,44 @@
 
       if (state.pointerType === "touch") {
         state.touchActive = true;
+        const now = performance.now();
+        state.lastTouchMoveTs = now;
+        state.lastTouchEventTs = now;
+        state.lastTouchX = event.clientX;
+        state.lastTouchY = event.clientY;
+        state.touchVelocityX = 0;
+        state.touchVelocityY = 0;
+        state.touchInertiaActive = false;
+        state.hasTouchTarget = false;
 
-        if (performance.now() < state.scrollLockUntil) {
+        if (now < state.scrollLockUntil) {
           return;
         }
       }
 
-      setActivePoint(event.clientX, event.clientY);
+      setActivePoint(event.clientX, event.clientY, true);
     }
 
     function onPointerEnd() {
+      const isTouch = state.pointerType === "touch";
+      const speed = Math.hypot(state.touchVelocityX, state.touchVelocityY);
+      const wasSuppressed = state.suppressUntilPointerUp;
+
       state.suppressUntilPointerUp = false;
       state.touchActive = false;
+
+      if (isTouch && !wasSuppressed && speed > touchInertiaMinSpeed) {
+        state.touchInertiaActive = true;
+        state.touchInertiaUntil = performance.now() + touchInertiaMaxMs;
+        state.pointerType = "touch";
+        state.active = true;
+        scheduleRender();
+        return;
+      }
+
+      state.touchInertiaActive = false;
+      state.touchVelocityX = 0;
+      state.touchVelocityY = 0;
       state.pointerType = "";
       clearActivePoint();
     }
@@ -287,6 +423,9 @@
         if (state.pointerType === "touch" || state.touchActive) {
           state.scrollLockUntil = performance.now() + touchScrollCooldownMs;
           state.suppressUntilPointerUp = true;
+          state.touchInertiaActive = false;
+          state.touchVelocityX = 0;
+          state.touchVelocityY = 0;
           clearActivePoint();
         }
       },
