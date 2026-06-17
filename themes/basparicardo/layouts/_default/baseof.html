@@ -1,7 +1,8 @@
 <!doctype html>
-<html lang="{{ site.Language.LanguageCode | default `en` }}">
+<html lang="{{ site.Language.LanguageCode | default `en` }}" class="h-full overflow-hidden overscroll-none">
   {{ $fontPair := site.Params.fontPair | default "oswald-sora" }}
   {{ $isSoraPair := eq $fontPair "oswald-sora" }}
+  {{ $isInterPair := eq $fontPair "anton-inter" }}
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,14 +10,14 @@
     <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ site.Params.tagline }}{{ end }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=Oswald:wght@400;500;600;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=Oswald:wght@400;500;600;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ `css/main.css` | relURL }}">
   </head>
-  <body class="h-screen overflow-hidden bg-black text-slate-100 {{ if $isSoraPair }}font-ui-sora{{ else }}font-ui-manrope{{ end }}">
-    <main class="relative isolate h-screen" data-contour-surface>
+  <body class="h-full overflow-hidden overscroll-none bg-black text-slate-100 {{ if $isSoraPair }}font-ui-sora{{ else if $isInterPair }}font-ui-inter{{ else }}font-ui-manrope{{ end }}">
+    <main class="fixed inset-0 isolate overflow-hidden" data-contour-surface>
       {{ partial "contour-background.html" . }}
 
-      <div class="relative z-20 h-screen overflow-y-auto overflow-x-hidden overscroll-contain" data-contour-scroll>
+      <div class="relative z-20 h-full overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch]" data-contour-scroll>
         {{ block "main" . }}{{ end }}
       </div>
     </main>

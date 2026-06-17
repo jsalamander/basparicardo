@@ -12,6 +12,7 @@ module.exports = {
         "display-barlow": ['"Barlow Condensed"', 'sans-serif'],
         "ui-sora": ['"Sora"', 'system-ui', 'sans-serif'],
         "ui-manrope": ['"Manrope"', 'system-ui', 'sans-serif'],
+        "ui-inter": ['"Inter"', 'system-ui', 'sans-serif'],
       },
     },
   },
