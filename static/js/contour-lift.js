@@ -30,6 +30,7 @@
     const transformDuration = coarsePointer ? 0.4 : 0.55;
     const opacityDuration = coarsePointer ? 0.45 : 0.6;
     const mouseSmoothing = 0.18;
+    const touchScrollCooldownMs = 320;
 
     let needsRecalc = true;
     let sampledPoints = [];
@@ -113,6 +114,8 @@
       currentX: 0,
       currentY: 0,
       hasCurrentPoint: false,
+      touchActive: false,
+      scrollLockUntil: 0,
     };
 
     function render() {
@@ -211,6 +214,14 @@
       }
 
       if (state.pointerType === "touch") {
+        if (!state.touchActive) {
+          return;
+        }
+
+        if (performance.now() < state.scrollLockUntil) {
+          return;
+        }
+
         const dx = event.clientX - state.startX;
         const dy = event.clientY - state.startY;
         const verticalScrollIntent = Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx) * 1.2;
@@ -234,11 +245,21 @@
       state.startX = event.clientX;
       state.startY = event.clientY;
       state.suppressUntilPointerUp = false;
+
+      if (state.pointerType === "touch") {
+        state.touchActive = true;
+
+        if (performance.now() < state.scrollLockUntil) {
+          return;
+        }
+      }
+
       setActivePoint(event.clientX, event.clientY);
     }
 
     function onPointerEnd() {
       state.suppressUntilPointerUp = false;
+      state.touchActive = false;
       state.pointerType = "";
       clearActivePoint();
     }
@@ -262,6 +283,12 @@
       "scroll",
       () => {
         needsRecalc = true;
+
+        if (state.pointerType === "touch" || state.touchActive) {
+          state.scrollLockUntil = performance.now() + touchScrollCooldownMs;
+          state.suppressUntilPointerUp = true;
+          clearActivePoint();
+        }
       },
       { passive: true }
     );
