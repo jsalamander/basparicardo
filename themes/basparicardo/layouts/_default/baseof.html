@@ -14,5 +14,7 @@
     <main class="min-h-screen">
       {{ block "main" . }}{{ end }}
     </main>
+    <script src="{{ `js/vendor/gsap.min.js` | relURL }}" defer></script>
+    <script src="{{ `js/contour-lift.js` | relURL }}" defer></script>
   </body>
 </html>
