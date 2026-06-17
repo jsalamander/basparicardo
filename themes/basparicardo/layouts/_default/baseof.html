@@ -11,6 +11,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=Oswald:wght@400;500;600;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="{{ `fav-baspa.png` | relURL }}">
+    <link rel="shortcut icon" href="{{ `fav-baspa.png` | relURL }}">
     <link rel="stylesheet" href="{{ `css/main.css` | relURL }}">
   </head>
   <body class="h-full overflow-hidden overscroll-none bg-black text-slate-100 {{ if $isSoraPair }}font-ui-sora{{ else if $isInterPair }}font-ui-inter{{ else }}font-ui-manrope{{ end }}">
@@ -19,6 +21,7 @@
 
       <div class="relative z-20 h-full overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch]" data-contour-scroll>
         {{ block "main" . }}{{ end }}
+        {{ partial "footer.html" . }}
       </div>
     </main>
     <script src="{{ `js/vendor/gsap.min.js` | relURL }}" defer></script>
