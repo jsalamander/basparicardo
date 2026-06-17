@@ -87,7 +87,6 @@
       transformBox: "fill-box",
       transformOrigin: "50% 50%",
       strokeOpacity: baseOpacity,
-      willChange: "transform,stroke-opacity",
     });
 
     function distanceToSegment(px, py, ax, ay, bx, by) {

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="{{ site.Language.LanguageCode | default `en` }}" class="h-full overflow-hidden overscroll-none">
+<html lang="{{ site.Language.LanguageCode | default `en` }}">
   {{ $fontPair := site.Params.fontPair | default "oswald-sora" }}
   {{ $isSoraPair := eq $fontPair "oswald-sora" }}
   {{ $isInterPair := eq $fontPair "anton-inter" }}
@@ -15,11 +15,11 @@
     <link rel="shortcut icon" href="{{ `fav-baspa.png` | relURL }}">
     <link rel="stylesheet" href="{{ `css/main.css` | relURL }}">
   </head>
-  <body class="h-full overflow-hidden overscroll-none bg-black text-slate-100 {{ if $isSoraPair }}font-ui-sora{{ else if $isInterPair }}font-ui-inter{{ else }}font-ui-manrope{{ end }}">
-    <main class="fixed inset-0 isolate overflow-hidden" data-contour-surface>
+  <body class="min-h-screen bg-black text-slate-100 {{ if $isSoraPair }}font-ui-sora{{ else if $isInterPair }}font-ui-inter{{ else }}font-ui-manrope{{ end }}">
+    <main class="relative isolate min-h-screen" data-contour-surface>
       {{ partial "contour-background.html" . }}
 
-      <div class="relative z-20 h-full overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch]" data-contour-scroll>
+      <div class="relative z-20">
         {{ block "main" . }}{{ end }}
         {{ partial "footer.html" . }}
       </div>
