@@ -25,32 +25,30 @@
     const coarsePointer =
       window.matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
     const maxLift = 0;
-    const radiusScale = coarsePointer ? 1.02 : 0.82;
+    const radiusScale = coarsePointer ? 1.2 : 0.82;
     const baseOpacity = 0.62;
-    const contactPulseColor = "#F79628";
-    const contactPulseDuration = coarsePointer ? 0.9 : 0.8;
-    const contactPulseWidthBoost = coarsePointer ? 0.9 : 1.1;
     const maxSamplesPerPath = coarsePointer ? 34 : 42;
     const mouseSmoothing = 0.13;
-    const touchSmoothing = 0.15;
+    const touchSmoothing = 0.24;
     const touchScrollCooldownMs = 320;
     const mouseMoveEpsilon = 1.2;
     const touchMoveEpsilon = 1.6;
-    const touchMoveThrottleMs = 16;
-    const lineResponse = coarsePointer ? 0.14 : 0.16;
-    const touchInertiaDecay = 0.93;
-    const touchInertiaMinSpeed = 70;
-    const touchInertiaMaxMs = 420;
-    const pulseDebounceMs = coarsePointer ? 800 : 300;
-    const segmentVelocityBase = coarsePointer ? 138 : 165;
+    const touchMoveThrottleMs = 10;
+    const lineResponse = coarsePointer ? 0.24 : 0.16;
+    const touchInertiaDecay = 0.962;
+    const touchInertiaMinSpeed = 48;
+    const touchInertiaMaxMs = 700;
+    const segmentVelocityBase = coarsePointer ? 210 : 165;
     const segmentVelocityDamping = 0.992;
     const segmentStrengthDamping = 0.955;
-    const segmentLengthGrowthPerSecond = coarsePointer ? 18 : 24;
-    const segmentLocalLift = coarsePointer ? 6.8 : 7.4;
-    const minSegmentSpeed = coarsePointer ? 10 : 8;
-    const segmentStrengthGain = coarsePointer ? 1.22 : 1;
-    const segmentOpacityFloor = coarsePointer ? 0.36 : 0.3;
-    const segmentOpacityScale = coarsePointer ? 0.86 : 0.8;
+    const segmentLengthGrowthPerSecond = coarsePointer ? 28 : 24;
+    const segmentLocalLift = coarsePointer ? 11.5 : 7.4;
+    const minSegmentSpeed = coarsePointer ? 6 : 8;
+    const segmentStrengthGain = coarsePointer ? 1.85 : 1;
+    const segmentOpacityFloor = coarsePointer ? 0.52 : 0.3;
+    const segmentOpacityScale = coarsePointer ? 1.18 : 0.8;
+    const segmentWidthBoost = coarsePointer ? 1.75 : 1.15;
+    const maxSegmentStrength = coarsePointer ? 2.05 : 1.45;
 
     let needsRecalc = true;
     let sampledPoints = [];
@@ -107,6 +105,36 @@
       return 0.9;
     });
 
+    function getSvgPoint(clientX, clientY) {
+      const rect = svg.getBoundingClientRect();
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+
+      if (!viewBox || viewBox.width <= 0 || viewBox.height <= 0 || rect.width <= 0 || rect.height <= 0) {
+        return { x: clientX, y: clientY };
+      }
+
+      const scale = Math.max(rect.width / viewBox.width, rect.height / viewBox.height);
+      const renderedWidth = viewBox.width * scale;
+      const renderedHeight = viewBox.height * scale;
+      const offsetX = rect.left + (rect.width - renderedWidth) / 2;
+      const offsetY = rect.top + (rect.height - renderedHeight) / 2;
+
+      return {
+        x: viewBox.x + (clientX - offsetX) / scale,
+        y: viewBox.y + (clientY - offsetY) / scale,
+      };
+    }
+
+    function getLocalRadius() {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width > 0 && viewBox.height > 0) {
+        return Math.max(120, Math.min(viewBox.width, viewBox.height) * radiusScale);
+      }
+
+      const fallbackBox = paths[0].getBBox();
+      return Math.max(120, Math.min(fallbackBox.width, fallbackBox.height) * radiusScale);
+    }
+
     window.gsap.set(paths, {
       transformBox: "fill-box",
       transformOrigin: "50% 50%",
@@ -155,6 +183,40 @@
       return minDistance;
     }
 
+    function nearestPointOnPolyline(points, x, y) {
+      if (points.length < 2) {
+        const only = points[0];
+        return {
+          distance: only ? Math.hypot(x - only.x, y - only.y) : Number.POSITIVE_INFINITY,
+          length: only ? only.length : 0,
+        };
+      }
+
+      let nearestDistance = Number.POSITIVE_INFINITY;
+      let nearestLength = 0;
+
+      for (let index = 1; index < points.length; index += 1) {
+        const prev = points[index - 1];
+        const current = points[index];
+        const abx = current.x - prev.x;
+        const aby = current.y - prev.y;
+        const apx = x - prev.x;
+        const apy = y - prev.y;
+        const lengthSq = abx * abx + aby * aby;
+        const t = lengthSq === 0 ? 0 : Math.max(0, Math.min(1, (apx * abx + apy * aby) / lengthSq));
+        const closestX = prev.x + abx * t;
+        const closestY = prev.y + aby * t;
+        const distance = Math.hypot(x - closestX, y - closestY);
+
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestLength = prev.length + (current.length - prev.length) * t;
+        }
+      }
+
+      return { distance: nearestDistance, length: nearestLength };
+    }
+
     function cacheSampledPoints() {
       pathLengths = paths.map((path) => {
         try {
@@ -171,23 +233,17 @@
           const totalLength = path.getTotalLength();
           const sampleCount = Math.max(12, Math.min(maxSamplesPerPath, Math.ceil(totalLength / 28)));
           const step = sampleCount > 1 ? totalLength / (sampleCount - 1) : totalLength;
-          const ctm = path.getScreenCTM();
-
-          if (!ctm) {
-            throw new Error("Missing screen matrix");
-          }
 
           for (let index = 0; index < sampleCount; index += 1) {
             const lengthAt = Math.min(totalLength, step * index);
             const point = path.getPointAtLength(lengthAt);
-            const screenPoint = point.matrixTransform(ctm);
-            samples.push({ x: screenPoint.x, y: screenPoint.y, length: lengthAt });
+            samples.push({ x: point.x, y: point.y, length: lengthAt });
           }
         } catch {
-          const rect = path.getBoundingClientRect();
+          const rect = path.getBBox();
           samples.push({
-            x: rect.left + rect.width / 2,
-            y: rect.top + rect.height / 2,
+            x: rect.x + rect.width / 2,
+            y: rect.y + rect.height / 2,
             length: 0,
           });
         }
@@ -209,28 +265,17 @@
 
       for (let index = 0; index < sampledPoints.length; index += 1) {
         const points = sampledPoints[index];
-        const distance = distanceToPolyline(points, x, y);
+        const nearest = nearestPointOnPolyline(points, x, y);
+        const distance = nearest.distance;
 
         if (distance < nearestDistance) {
-          nearestDistance = distance;
           nearestIndex = index;
-
-          let sampleIndex = 0;
-          let sampleDistance = Number.POSITIVE_INFINITY;
-          for (let pointIndex = 0; pointIndex < points.length; pointIndex += 1) {
-            const point = points[pointIndex];
-            const current = Math.hypot(point.x - x, point.y - y);
-            if (current < sampleDistance) {
-              sampleDistance = current;
-              sampleIndex = pointIndex;
-            }
-          }
-
-          nearestLength = points[sampleIndex] ? points[sampleIndex].length : 0;
+          nearestDistance = distance;
+          nearestLength = nearest.length;
         }
       }
 
-      return { nearestIndex, nearestDistance, nearestLength };
+      return { nearestIndex, nearestLength };
     }
 
     function injectSegmentImpulse(x, y, velocityX, velocityY) {
@@ -260,7 +305,7 @@
         const falloff = Math.pow(0.62, Math.abs(offset));
         const targetLength = Math.max(1, pathLengths[targetIndex] || 1);
         const center = Math.max(0, Math.min(targetLength, normalized * targetLength));
-        const strength = Math.min(1.45, (speed / 420) * falloff * segmentStrengthGain);
+        const strength = Math.min(maxSegmentStrength, (speed / 420) * falloff * segmentStrengthGain);
 
         segmentPulses[targetIndex].push({
           center,
@@ -325,7 +370,7 @@
         const localShift = -Math.sign(dominant.velocity || 1) * dominant.strength * segmentLocalLift;
 
         overlayPaths[index].setAttribute("stroke", originalStrokeColors[index]);
-        overlayPaths[index].setAttribute("stroke-width", `${(originalStrokeWidths[index] + dominant.strength * 1.15).toFixed(3)}`);
+        overlayPaths[index].setAttribute("stroke-width", `${(originalStrokeWidths[index] + dominant.strength * segmentWidthBoost).toFixed(3)}`);
         overlayPaths[index].style.strokeOpacity = `${Math.min(0.98, segmentOpacityFloor + dominant.strength * segmentOpacityScale).toFixed(3)}`;
         overlayPaths[index].setAttribute("stroke-dasharray", `${dashLength.toFixed(2)} ${(pathLength + dashLength).toFixed(2)}`);
         overlayPaths[index].setAttribute("stroke-dashoffset", `${dashOffset.toFixed(2)}`);
@@ -333,52 +378,6 @@
       }
 
       return animating;
-    }
-
-    function pulseNearestLine(x, y) {
-      if (needsRecalc) {
-        cacheSampledPoints();
-      }
-
-      let nearestIndex = -1;
-      let nearestDistance = Number.POSITIVE_INFINITY;
-
-      for (let index = 0; index < sampledPoints.length; index += 1) {
-        const points = sampledPoints[index];
-        const distance = distanceToPolyline(points, x, y);
-
-        if (distance < nearestDistance) {
-          nearestDistance = distance;
-          nearestIndex = index;
-        }
-      }
-
-      if (nearestIndex < 0) {
-        return;
-      }
-
-      const path = paths[nearestIndex];
-      const originalStroke = originalStrokeColors[nearestIndex];
-      const originalWidth = originalStrokeWidths[nearestIndex];
-
-      // Only kill stroke-related tweens, not transform tweens
-      window.gsap.killTweensOf(path, "stroke,strokeOpacity,strokeWidth");
-      
-      window.gsap.set(path, {
-        stroke: contactPulseColor,
-        strokeOpacity: 1,
-        strokeWidth: originalWidth + contactPulseWidthBoost,
-      });
-      window.gsap.to(path, {
-        duration: contactPulseDuration,
-        ease: "power2.out",
-        stroke: originalStroke,
-        strokeOpacity: baseOpacity,
-        strokeWidth: originalWidth,
-        overwrite: "auto",
-      });
-
-      state.lastPulseTs = performance.now();
     }
 
     function relaxPaths() {
@@ -406,8 +405,6 @@
 
     const state = {
       active: false,
-      x: 0,
-      y: 0,
       frameQueued: false,
       pointerType: "",
       startX: 0,
@@ -418,7 +415,6 @@
       currentX: 0,
       currentY: 0,
       hasCurrentPoint: false,
-      hasTouchTarget: false,
       touchActive: false,
       scrollLockUntil: 0,
       lastTouchMoveTs: 0,
@@ -429,8 +425,6 @@
       touchVelocityY: 0,
       touchInertiaActive: false,
       touchInertiaUntil: 0,
-      lastPulseTs: 0,
-      pointerDownTs: 0,
       lastPointerX: 0,
       lastPointerY: 0,
       lastPointerTs: 0,
@@ -497,8 +491,7 @@
         state.currentY += (state.targetY - state.currentY) * smoothing;
       }
 
-      const svgRect = svg.getBoundingClientRect();
-      const radius = Math.max(120, Math.min(svgRect.width, svgRect.height) * radiusScale);
+      const radius = getLocalRadius();
 
       let needsAnotherFrame = false;
 
@@ -552,9 +545,6 @@
 
       state.targetX = x;
       state.targetY = y;
-      if (state.pointerType === "touch") {
-        state.hasTouchTarget = true;
-      }
 
       if (!state.hasCurrentPoint) {
         state.currentX = x;
@@ -568,7 +558,6 @@
     function clearActivePoint() {
       state.active = false;
       state.hasCurrentPoint = false;
-      state.hasTouchTarget = false;
       scheduleRender();
     }
 
@@ -581,6 +570,7 @@
       const pointerDt = Math.max(1, now - state.lastPointerTs);
       const pointerVelocityX = ((event.clientX - state.lastPointerX) / pointerDt) * 1000;
       const pointerVelocityY = ((event.clientY - state.lastPointerY) / pointerDt) * 1000;
+      const localPoint = getSvgPoint(event.clientX, event.clientY);
       state.lastPointerX = event.clientX;
       state.lastPointerY = event.clientY;
       state.lastPointerTs = now;
@@ -590,15 +580,11 @@
           return;
         }
 
-        // Allow updates for the first 100ms after pointer down, even if scroll locked
-        const timeSinceDown = performance.now() - state.pointerDownTs;
-        if (timeSinceDown > 100 && performance.now() < state.scrollLockUntil) {
-          return;
-        }
-
         const dx = event.clientX - state.startX;
         const dy = event.clientY - state.startY;
-        const verticalScrollIntent = Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx) * 1.2;
+        const verticalScrollIntent = coarsePointer
+          ? Math.abs(dy) > 28 && Math.abs(dy) > Math.abs(dx) * 1.6
+          : Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx) * 1.2;
 
         if (verticalScrollIntent) {
           state.suppressUntilPointerUp = true;
@@ -622,12 +608,12 @@
         state.lastTouchY = event.clientY;
         state.lastTouchEventTs = now;
 
-        injectSegmentImpulse(event.clientX, event.clientY, state.touchVelocityX, state.touchVelocityY);
+        injectSegmentImpulse(localPoint.x, localPoint.y, state.touchVelocityX, state.touchVelocityY);
       } else {
-        injectSegmentImpulse(event.clientX, event.clientY, pointerVelocityX, pointerVelocityY);
+        injectSegmentImpulse(localPoint.x, localPoint.y, pointerVelocityX, pointerVelocityY);
       }
 
-      setActivePoint(event.clientX, event.clientY);
+      setActivePoint(localPoint.x, localPoint.y);
     }
 
     function onPointerDown(event) {
@@ -642,7 +628,6 @@
       if (state.pointerType === "touch") {
         state.touchActive = true;
         const now = performance.now();
-        state.pointerDownTs = now;
         state.lastTouchMoveTs = now;
         state.lastTouchEventTs = now;
         state.lastTouchX = event.clientX;
@@ -650,18 +635,13 @@
         state.touchVelocityX = 0;
         state.touchVelocityY = 0;
         state.touchInertiaActive = false;
-        state.hasTouchTarget = false;
 
-        // Block pointer down during scroll lock to prevent race conditions
-        if (now < state.scrollLockUntil) {
-          return;
-        }
-        // No pulse on touch — just use movement-based segment impulses
       } else {
         // Desktop click pulse removed; movement drives the effect.
       }
 
-      setActivePoint(event.clientX, event.clientY, true);
+      const localPoint = getSvgPoint(event.clientX, event.clientY);
+      setActivePoint(localPoint.x, localPoint.y, true);
     }
 
     function onPointerEnd() {
