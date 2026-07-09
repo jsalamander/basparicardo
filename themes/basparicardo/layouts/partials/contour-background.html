@@ -1,7 +1,7 @@
 {{ $svg := readFile "static/image/contours-reduced.svg" }}
 {{ $svg = replaceRE "<svg" "<svg class=\"h-full w-full\" data-contours-svg=\"\"" $svg 1 }}
 
-<div class="fixed inset-0 -z-10 overflow-hidden pointer-events-none opacity-50" aria-hidden="true">
+<div class="fixed inset-0 -z-10 overflow-hidden pointer-events-none opacity-68" aria-hidden="true">
   <div class="h-screen w-screen">
     {{ $svg | safeHTML }}
   </div>

@@ -24,20 +24,20 @@
 
     const coarsePointer =
       window.matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
-    const maxLift = coarsePointer ? 6 : 7.4;
-    const radiusScale = coarsePointer ? 0.92 : 0.7;
-    const baseOpacity = 0.48;
+    const maxLift = coarsePointer ? 8.1 : 9.8;
+    const radiusScale = coarsePointer ? 1.02 : 0.82;
+    const baseOpacity = 0.62;
     const contactPulseColor = "#F79628";
     const contactPulseDuration = coarsePointer ? 0.9 : 0.8;
     const contactPulseWidthBoost = coarsePointer ? 0.9 : 1.1;
     const maxSamplesPerPath = coarsePointer ? 34 : 42;
-    const mouseSmoothing = 0.11;
-    const touchSmoothing = 0.12;
+    const mouseSmoothing = 0.13;
+    const touchSmoothing = 0.15;
     const touchScrollCooldownMs = 320;
     const mouseMoveEpsilon = 1.2;
     const touchMoveEpsilon = 1.6;
     const touchMoveThrottleMs = 16;
-    const lineResponse = coarsePointer ? 0.11 : 0.13;
+    const lineResponse = coarsePointer ? 0.14 : 0.16;
     const touchInertiaDecay = 0.93;
     const touchInertiaMinSpeed = 70;
     const touchInertiaMaxMs = 420;
