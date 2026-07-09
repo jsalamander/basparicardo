@@ -24,7 +24,7 @@
 
     const coarsePointer =
       window.matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
-    const maxLift = coarsePointer ? 8.1 : 9.8;
+    const maxLift = 0;
     const radiusScale = coarsePointer ? 1.02 : 0.82;
     const baseOpacity = 0.62;
     const contactPulseColor = "#F79628";
@@ -42,13 +42,37 @@
     const touchInertiaMinSpeed = 70;
     const touchInertiaMaxMs = 420;
     const pulseDebounceMs = coarsePointer ? 800 : 300;
+    const segmentVelocityBase = coarsePointer ? 138 : 165;
+    const segmentVelocityDamping = 0.992;
+    const segmentStrengthDamping = 0.955;
+    const segmentLengthGrowthPerSecond = coarsePointer ? 18 : 24;
+    const segmentLocalLift = coarsePointer ? 6.8 : 7.4;
+    const minSegmentSpeed = coarsePointer ? 10 : 8;
+    const segmentStrengthGain = coarsePointer ? 1.22 : 1;
+    const segmentOpacityFloor = coarsePointer ? 0.36 : 0.3;
+    const segmentOpacityScale = coarsePointer ? 0.86 : 0.8;
 
     let needsRecalc = true;
     let sampledPoints = [];
+    let pathLengths = [];
 
     const setters = paths.map((path) => ({
       y: window.gsap.quickSetter(path, "y"),
     }));
+
+    const overlayPaths = paths.map((path) => {
+      const overlay = path.cloneNode(true);
+      overlay.setAttribute("data-contour-segment-overlay", "");
+      overlay.setAttribute("stroke", "#fffed5");
+      overlay.setAttribute("stroke-opacity", "0");
+      overlay.setAttribute("fill", "none");
+      overlay.style.pointerEvents = "none";
+      path.parentNode.appendChild(overlay);
+      return overlay;
+    });
+
+    const overlaySettersY = overlayPaths.map((path) => window.gsap.quickSetter(path, "y"));
+    const segmentPulses = paths.map(() => []);
 
     const lineState = paths.map(() => ({
       y: 0,
@@ -87,6 +111,10 @@
       transformBox: "fill-box",
       transformOrigin: "50% 50%",
       strokeOpacity: baseOpacity,
+    });
+    window.gsap.set(overlayPaths, {
+      transformBox: "fill-box",
+      transformOrigin: "50% 50%",
     });
 
     function distanceToSegment(px, py, ax, ay, bx, by) {
@@ -128,6 +156,14 @@
     }
 
     function cacheSampledPoints() {
+      pathLengths = paths.map((path) => {
+        try {
+          return path.getTotalLength();
+        } catch {
+          return 1;
+        }
+      });
+
       sampledPoints = paths.map((path) => {
         const samples = [];
 
@@ -142,15 +178,17 @@
           }
 
           for (let index = 0; index < sampleCount; index += 1) {
-            const point = path.getPointAtLength(Math.min(totalLength, step * index));
+            const lengthAt = Math.min(totalLength, step * index);
+            const point = path.getPointAtLength(lengthAt);
             const screenPoint = point.matrixTransform(ctm);
-            samples.push({ x: screenPoint.x, y: screenPoint.y });
+            samples.push({ x: screenPoint.x, y: screenPoint.y, length: lengthAt });
           }
         } catch {
           const rect = path.getBoundingClientRect();
           samples.push({
             x: rect.left + rect.width / 2,
             y: rect.top + rect.height / 2,
+            length: 0,
           });
         }
 
@@ -158,6 +196,143 @@
       });
 
       needsRecalc = false;
+    }
+
+    function nearestPathAndLength(x, y) {
+      if (needsRecalc) {
+        cacheSampledPoints();
+      }
+
+      let nearestIndex = -1;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+      let nearestLength = 0;
+
+      for (let index = 0; index < sampledPoints.length; index += 1) {
+        const points = sampledPoints[index];
+        const distance = distanceToPolyline(points, x, y);
+
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestIndex = index;
+
+          let sampleIndex = 0;
+          let sampleDistance = Number.POSITIVE_INFINITY;
+          for (let pointIndex = 0; pointIndex < points.length; pointIndex += 1) {
+            const point = points[pointIndex];
+            const current = Math.hypot(point.x - x, point.y - y);
+            if (current < sampleDistance) {
+              sampleDistance = current;
+              sampleIndex = pointIndex;
+            }
+          }
+
+          nearestLength = points[sampleIndex] ? points[sampleIndex].length : 0;
+        }
+      }
+
+      return { nearestIndex, nearestDistance, nearestLength };
+    }
+
+    function injectSegmentImpulse(x, y, velocityX, velocityY) {
+      const speed = Math.hypot(velocityX, velocityY);
+      if (speed < minSegmentSpeed) {
+        return;
+      }
+
+      const nearest = nearestPathAndLength(x, y);
+      if (nearest.nearestIndex < 0) {
+        return;
+      }
+
+      const baseIndex = nearest.nearestIndex;
+      const baseLength = Math.max(1, pathLengths[baseIndex] || 1);
+      const normalized = nearest.nearestLength / baseLength;
+      const direction = Math.abs(velocityX) >= Math.abs(velocityY)
+        ? Math.sign(velocityX || 1)
+        : Math.sign(velocityY || 1);
+
+      for (let offset = -2; offset <= 2; offset += 1) {
+        const targetIndex = baseIndex + offset;
+        if (targetIndex < 0 || targetIndex >= segmentPulses.length) {
+          continue;
+        }
+
+        const falloff = Math.pow(0.62, Math.abs(offset));
+        const targetLength = Math.max(1, pathLengths[targetIndex] || 1);
+        const center = Math.max(0, Math.min(targetLength, normalized * targetLength));
+        const strength = Math.min(1.45, (speed / 420) * falloff * segmentStrengthGain);
+
+        segmentPulses[targetIndex].push({
+          center,
+          velocity: direction * segmentVelocityBase * (0.85 + 0.15 * falloff),
+          length: Math.max(28, Math.min(targetLength * 0.38, (coarsePointer ? 46 : 60) + speed * 0.045)),
+          strength,
+        });
+      }
+
+      scheduleRender();
+    }
+
+    function renderSegmentImpulses(deltaSeconds) {
+      let animating = false;
+
+      for (let index = 0; index < segmentPulses.length; index += 1) {
+        const pulses = segmentPulses[index];
+        const pathLength = Math.max(1, pathLengths[index] || 1);
+        const remaining = [];
+
+        for (let pulseIndex = 0; pulseIndex < pulses.length; pulseIndex += 1) {
+          const pulse = pulses[pulseIndex];
+
+          pulse.center += pulse.velocity * deltaSeconds;
+          if (pulse.center < 0) {
+            pulse.center = 0;
+            pulse.velocity = Math.abs(pulse.velocity) * 0.72;
+          } else if (pulse.center > pathLength) {
+            pulse.center = pathLength;
+            pulse.velocity = -Math.abs(pulse.velocity) * 0.72;
+          }
+
+          pulse.velocity *= segmentVelocityDamping;
+          pulse.strength *= Math.pow(segmentStrengthDamping, Math.max(1, deltaSeconds * 60));
+          pulse.length = Math.min(pathLength * 0.48, pulse.length + segmentLengthGrowthPerSecond * deltaSeconds);
+
+          if (pulse.strength > 0.015) {
+            remaining.push(pulse);
+            animating = true;
+          }
+        }
+
+        segmentPulses[index] = remaining;
+
+        if (remaining.length === 0) {
+          overlayPaths[index].style.strokeOpacity = "0";
+          overlaySettersY[index](0);
+          continue;
+        }
+
+        let dominant = remaining[0];
+        for (let pulseIndex = 1; pulseIndex < remaining.length; pulseIndex += 1) {
+          if (remaining[pulseIndex].strength > dominant.strength) {
+            dominant = remaining[pulseIndex];
+          }
+        }
+
+        const dashLength = Math.max(22, Math.min(pathLength * 0.48, dominant.length));
+        const maxStart = Math.max(0, pathLength - dashLength);
+        const dashStart = Math.max(0, Math.min(maxStart, dominant.center - dashLength * 0.5));
+        const dashOffset = -dashStart;
+        const localShift = -Math.sign(dominant.velocity || 1) * dominant.strength * segmentLocalLift;
+
+        overlayPaths[index].setAttribute("stroke", originalStrokeColors[index]);
+        overlayPaths[index].setAttribute("stroke-width", `${(originalStrokeWidths[index] + dominant.strength * 1.15).toFixed(3)}`);
+        overlayPaths[index].style.strokeOpacity = `${Math.min(0.98, segmentOpacityFloor + dominant.strength * segmentOpacityScale).toFixed(3)}`;
+        overlayPaths[index].setAttribute("stroke-dasharray", `${dashLength.toFixed(2)} ${(pathLength + dashLength).toFixed(2)}`);
+        overlayPaths[index].setAttribute("stroke-dashoffset", `${dashOffset.toFixed(2)}`);
+        overlaySettersY[index](localShift);
+      }
+
+      return animating;
     }
 
     function pulseNearestLine(x, y) {
@@ -256,11 +431,17 @@
       touchInertiaUntil: 0,
       lastPulseTs: 0,
       pointerDownTs: 0,
+      lastPointerX: 0,
+      lastPointerY: 0,
+      lastPointerTs: 0,
+      lastFrameTs: 0,
     };
 
     function render() {
       state.frameQueued = false;
       const now = performance.now();
+      const deltaSeconds = state.lastFrameTs > 0 ? Math.min(0.05, (now - state.lastFrameTs) / 1000) : 1 / 60;
+      state.lastFrameTs = now;
 
       if (needsRecalc) {
         cacheSampledPoints();
@@ -297,7 +478,8 @@
 
       if (!state.active) {
         const settled = relaxPaths();
-        if (!settled) {
+        const impulseAnimating = renderSegmentImpulses(deltaSeconds);
+        if (!settled || impulseAnimating) {
           scheduleRender();
         }
         return;
@@ -339,8 +521,10 @@
         set.y(stateItem.y);
       }
 
+      const impulseAnimating = renderSegmentImpulses(deltaSeconds);
+
       const remaining = Math.hypot(state.targetX - state.currentX, state.targetY - state.currentY);
-      if (remaining > 0.25 || needsAnotherFrame) {
+      if (remaining > 0.25 || needsAnotherFrame || impulseAnimating) {
         scheduleRender();
       }
     }
@@ -393,6 +577,14 @@
         state.pointerType = event.pointerType || "mouse";
       }
 
+      const now = performance.now();
+      const pointerDt = Math.max(1, now - state.lastPointerTs);
+      const pointerVelocityX = ((event.clientX - state.lastPointerX) / pointerDt) * 1000;
+      const pointerVelocityY = ((event.clientY - state.lastPointerY) / pointerDt) * 1000;
+      state.lastPointerX = event.clientX;
+      state.lastPointerY = event.clientY;
+      state.lastPointerTs = now;
+
       if (state.pointerType === "touch") {
         if (!state.touchActive) {
           return;
@@ -418,7 +610,6 @@
           return;
         }
 
-        const now = performance.now();
         if (now - state.lastTouchMoveTs < touchMoveThrottleMs) {
           return;
         }
@@ -430,6 +621,10 @@
         state.lastTouchX = event.clientX;
         state.lastTouchY = event.clientY;
         state.lastTouchEventTs = now;
+
+        injectSegmentImpulse(event.clientX, event.clientY, state.touchVelocityX, state.touchVelocityY);
+      } else {
+        injectSegmentImpulse(event.clientX, event.clientY, pointerVelocityX, pointerVelocityY);
       }
 
       setActivePoint(event.clientX, event.clientY);
@@ -440,6 +635,9 @@
       state.startX = event.clientX;
       state.startY = event.clientY;
       state.suppressUntilPointerUp = false;
+      state.lastPointerX = event.clientX;
+      state.lastPointerY = event.clientY;
+      state.lastPointerTs = performance.now();
 
       if (state.pointerType === "touch") {
         state.touchActive = true;
@@ -458,13 +656,9 @@
         if (now < state.scrollLockUntil) {
           return;
         }
-        // No pulse on touch — just use the lift effect for feedback
+        // No pulse on touch — just use movement-based segment impulses
       } else {
-        // Mouse: pulse with debounce
-        const now = performance.now();
-        if (now - state.lastPulseTs >= pulseDebounceMs) {
-          pulseNearestLine(event.clientX, event.clientY);
-        }
+        // Desktop click pulse removed; movement drives the effect.
       }
 
       setActivePoint(event.clientX, event.clientY, true);
