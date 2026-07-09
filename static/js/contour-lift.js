@@ -30,7 +30,6 @@
     const maxSamplesPerPath = coarsePointer ? 34 : 42;
     const mouseSmoothing = 0.13;
     const touchSmoothing = 0.24;
-    const touchScrollCooldownMs = 320;
     const mouseMoveEpsilon = 1.2;
     const touchMoveEpsilon = 1.6;
     const touchMoveThrottleMs = 10;
@@ -38,10 +37,10 @@
     const touchInertiaDecay = 0.962;
     const touchInertiaMinSpeed = 48;
     const touchInertiaMaxMs = 700;
-    const segmentVelocityBase = coarsePointer ? 210 : 165;
-    const segmentVelocityDamping = 0.992;
-    const segmentStrengthDamping = 0.955;
-    const segmentLengthGrowthPerSecond = coarsePointer ? 28 : 24;
+    const segmentVelocityBase = coarsePointer ? 180 : 145;
+    const segmentVelocityDamping = 0.988;
+    const segmentStrengthDamping = 0.95;
+    const segmentLengthGrowthPerSecond = coarsePointer ? 20 : 18;
     const segmentLocalLift = coarsePointer ? 11.5 : 7.4;
     const minSegmentSpeed = coarsePointer ? 6 : 8;
     const segmentStrengthGain = coarsePointer ? 1.85 : 1;
@@ -416,7 +415,6 @@
       currentY: 0,
       hasCurrentPoint: false,
       touchActive: false,
-      scrollLockUntil: 0,
       lastTouchMoveTs: 0,
       lastTouchX: 0,
       lastTouchY: 0,
@@ -685,15 +683,6 @@
 
     const handleScroll = () => {
       needsRecalc = true;
-
-      if (state.pointerType === "touch" || state.touchActive) {
-        state.scrollLockUntil = performance.now() + touchScrollCooldownMs;
-        state.suppressUntilPointerUp = true;
-        state.touchInertiaActive = false;
-        state.touchVelocityX = 0;
-        state.touchVelocityY = 0;
-        // Don't clear the effect during scroll — let it relax naturally
-      }
     };
 
     if (scrollContainers.length > 0) {
