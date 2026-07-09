@@ -11,8 +11,7 @@ const CROP = {
   height: 500,
 };
 
-const EDGE_MARGIN = 36;
-const DECIMATION_STEP = 8;
+const DECIMATION_STEP = 6;
 const MAX_PATHS = 24;
 
 const svg = fs.readFileSync(INPUT, 'utf8');
@@ -76,13 +75,53 @@ function parsePathD(d) {
   return subpaths;
 }
 
-function isInsideCrop(point) {
-  return (
-    point.x >= CROP.x - EDGE_MARGIN &&
-    point.x <= CROP.x + CROP.width + EDGE_MARGIN &&
-    point.y >= CROP.y - EDGE_MARGIN &&
-    point.y <= CROP.y + CROP.height + EDGE_MARGIN
-  );
+function clipSegmentToRect(a, b, rect) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  let t0 = 0;
+  let t1 = 1;
+
+  const checks = [
+    [-dx, a.x - rect.x],
+    [dx, rect.x + rect.width - a.x],
+    [-dy, a.y - rect.y],
+    [dy, rect.y + rect.height - a.y],
+  ];
+
+  for (const [p, q] of checks) {
+    if (p === 0) {
+      if (q < 0) {
+        return null;
+      }
+      continue;
+    }
+
+    const ratio = q / p;
+    if (p < 0) {
+      if (ratio > t1) {
+        return null;
+      }
+      if (ratio > t0) {
+        t0 = ratio;
+      }
+    } else {
+      if (ratio < t0) {
+        return null;
+      }
+      if (ratio < t1) {
+        t1 = ratio;
+      }
+    }
+  }
+
+  if (t0 > t1) {
+    return null;
+  }
+
+  return [
+    { x: a.x + dx * t0, y: a.y + dy * t0 },
+    { x: a.x + dx * t1, y: a.y + dy * t1 },
+  ];
 }
 
 function round1(num) {
@@ -91,37 +130,64 @@ function round1(num) {
 
 const candidatePaths = [];
 
+function decimatePoints(points) {
+  if (points.length <= 2) {
+    return points;
+  }
+
+  const reduced = [points[0]];
+
+  for (let i = DECIMATION_STEP; i < points.length - 1; i += DECIMATION_STEP) {
+    reduced.push(points[i]);
+  }
+
+  reduced.push(points[points.length - 1]);
+  return reduced;
+}
+
 for (const match of pathMatches) {
   const d = match[1];
   const subpaths = parsePathD(d);
 
   for (const subpath of subpaths) {
-    const kept = [];
+    let current = [];
 
-    for (const point of subpath) {
-      if (isInsideCrop(point)) {
-        kept.push(point);
+    function flushCurrent() {
+      if (current.length >= 2) {
+        candidatePaths.push(decimatePoints(current));
+      }
+      current = [];
+    }
+
+    for (let i = 1; i < subpath.length; i += 1) {
+      const segment = clipSegmentToRect(subpath[i - 1], subpath[i], CROP);
+      if (!segment) {
+        flushCurrent();
+        continue;
+      }
+
+      const [start, end] = segment;
+
+      if (current.length === 0) {
+        current.push(start, end);
+        continue;
+      }
+
+      const last = current[current.length - 1];
+      const gap = Math.hypot(last.x - start.x, last.y - start.y);
+
+      if (gap > 0.75) {
+        flushCurrent();
+        current.push(start, end);
+      } else {
+        if (gap > 0.01) {
+          current.push(start);
+        }
+        current.push(end);
       }
     }
 
-    if (kept.length < 12) {
-      continue;
-    }
-
-    const reduced = [];
-    reduced.push(kept[0]);
-
-    for (let i = DECIMATION_STEP; i < kept.length - 1; i += DECIMATION_STEP) {
-      reduced.push(kept[i]);
-    }
-
-    reduced.push(kept[kept.length - 1]);
-
-    if (reduced.length < 6) {
-      continue;
-    }
-
-    candidatePaths.push(reduced);
+    flushCurrent();
   }
 }
 
