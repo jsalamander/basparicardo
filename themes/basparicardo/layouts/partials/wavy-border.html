@@ -1,22 +1,29 @@
-{{/* 
-  Wavy border SVG with contour styling - subtle wavy effect
-  Usage: {{ partial "wavy-border.html" (dict "width" "100%" "height" "100%") }}
+{{/*
+  Closed contour frame for event panels.
+  Usage: {{ partial "wavy-border.html" . }}
 */}}
 
 <div class="absolute inset-0 h-full w-full pointer-events-none" aria-hidden="true">
-  <svg class="absolute left-[16px] right-[16px] top-[8px] h-[14px] w-[calc(100%-32px)]" viewBox="0 0 400 14" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
-    <path d="M 0 7 C 64 4, 128 10, 192 7 C 256 4, 320 10, 400 7" fill="none" stroke="#fffed5" stroke-width="1.05" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
-  </svg>
-
-  <svg class="absolute bottom-[8px] left-[16px] right-[16px] h-[14px] w-[calc(100%-32px)]" viewBox="0 0 400 14" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
-    <path d="M 0 7 C 64 10, 128 4, 192 7 C 256 10, 320 4, 400 7" fill="none" stroke="#fffed5" stroke-width="1.05" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
-  </svg>
-
-  <svg class="absolute bottom-[16px] left-[8px] top-[16px] h-[calc(100%-32px)] w-[14px]" viewBox="0 0 14 600" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
-    <path d="M 7 0 C 10 58, 4 116, 8 174 C 11 232, 3 290, 8 348 C 11 406, 4 464, 7 522 C 9 548, 5 574, 7 600" fill="none" stroke="#fffed5" stroke-width="1.05" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
-  </svg>
-
-  <svg class="absolute bottom-[16px] right-[8px] top-[16px] h-[calc(100%-32px)] w-[14px]" viewBox="0 0 14 600" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
-    <path d="M 7 0 C 4 58, 10 116, 6 174 C 3 232, 11 290, 6 348 C 3 406, 10 464, 7 522 C 5 548, 9 574, 7 600" fill="none" stroke="#fffed5" stroke-width="1.05" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+  <svg class="h-full w-full" viewBox="0 0 420 260" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+    <path
+      d="M 24 26 C 86 10, 150 38, 210 22 C 270 8, 334 36, 396 24 C 410 74, 382 122, 396 174 C 410 222, 352 244, 302 236 C 248 252, 184 220, 124 236 C 72 246, 18 222, 24 174 C 10 122, 38 74, 24 26"
+      fill="none"
+      stroke="#fffed5"
+      stroke-width="1.1"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      vector-effect="non-scaling-stroke"
+      opacity="0.9"
+    />
+    <path
+      d="M 34 36 C 94 22, 152 46, 210 32 C 268 20, 326 44, 386 34 C 398 80, 376 124, 386 172 C 396 214, 346 232, 298 226 C 246 240, 188 212, 132 226 C 84 236, 34 214, 34 172 C 22 124, 46 80, 34 36"
+      fill="none"
+      stroke="#fffed5"
+      stroke-width="0.8"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      vector-effect="non-scaling-stroke"
+      opacity="0.32"
+    />
   </svg>
 </div>

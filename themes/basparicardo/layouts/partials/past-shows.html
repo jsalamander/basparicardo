@@ -4,8 +4,10 @@
 {{ $isInterPair := eq $fontPair "anton-inter" }}
 {{ $displayClass := cond $isAntonPair "font-display-anton tracking-[0.06em]" (cond $isBarlowPair "font-display-barlow tracking-[0.08em]" "font-display-oswald tracking-[0.1em]") }}
 {{ $uiClass := cond $isInterPair "font-ui-inter" (cond (or $isAntonPair $isBarlowPair) "font-ui-manrope" "font-ui-sora") }}
+{{ $cardSurfaceClass := partial "card-surface-class.html" . }}
+{{ $eventNameFontClass := cond $isAntonPair "font-display-anton" (cond $isBarlowPair "font-display-barlow" "font-display-oswald") }}
 
-<section class="relative isolate flex min-h-screen touch-pan-y touch-manipulation items-start select-none">
+<section class="relative isolate flex min-h-screen touch-pan-y touch-manipulation items-start">
 
   <div class="relative z-20 mx-auto w-full max-w-6xl px-6 pb-16 pt-8 sm:px-10 sm:pt-10 md:pb-20 md:pt-12">
     <header class="mx-auto flex max-w-4xl justify-center">
@@ -23,20 +25,15 @@
       </h1>
     </div>
 
-    <div class="mx-auto mt-8 max-w-5xl relative p-4 sm:mt-10 sm:p-6 md:mt-12 md:p-8 {{ $uiClass }}">
-      <div class="pointer-events-none absolute inset-[10px] z-0 rounded-[1.55rem] bg-black/45"></div>
-      <div class="pointer-events-none absolute inset-0 z-10">
-        {{ partial "wavy-border.html" (dict "width" "100%" "height" "100%") }}
-      </div>
-      <div class="relative z-20 px-3 py-3 sm:px-4 sm:py-4 md:px-5 md:py-5">
-      <ul class="divide-y divide-[#fbf4c2]/15">
+    <div class="mx-auto mt-8 max-w-5xl {{ $uiClass }} sm:mt-10 md:mt-12">
+      <ul class="space-y-3 sm:space-y-4">
         {{ $now := now }}
         {{ $pastEvents := where .Site.Home.Params.events "date" "lt" ($now.Format "2006-01-02") }}
         {{ range sort $pastEvents "date" "desc" }}
           {{ $title := .title | default .name }}
-          <li class="grid grid-cols-1 items-end gap-2 py-4 text-[#fbf4c2] sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-8 sm:py-5">
-            <p class="text-center text-[clamp(1.15rem,3vw,1.75rem)] font-medium leading-tight tracking-[0.025em] [font-variant-numeric:tabular-nums] text-[#fbf4c2]/90 sm:text-left">{{ dateFormat "2 January 2006" .date }}</p>
-            <p class="text-center text-[clamp(1.45rem,4.6vw,2.7rem)] font-semibold leading-[0.96] tracking-[0.01em] sm:text-right">
+          <li class="{{ $cardSurfaceClass }} grid grid-cols-1 items-end gap-2 px-4 py-4 text-[#fbf4c2] sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-8 sm:px-5 sm:py-5">
+            <p class="{{ $uiClass }} text-center text-[clamp(1rem,2.4vw,1.35rem)] font-semibold uppercase leading-tight tracking-[0.035em] [font-variant-numeric:tabular-nums] text-[#fbf4c2]/82 sm:text-left">{{ dateFormat "2 January 2006" .date }}</p>
+            <p class="{{ $eventNameFontClass }} text-center text-[clamp(1.5rem,4.2vw,2.25rem)] leading-[0.96] tracking-[0.025em] text-[#fbf4c2] sm:text-right">
               {{ if .url }}
                 <a href="{{ .url }}" target="_blank" rel="noopener noreferrer" class="underline decoration-[#fbf4c2]/45 underline-offset-[0.22em] transition-colors hover:decoration-[#fbf4c2]">{{ $title }}</a>
               {{ else }}
@@ -46,7 +43,6 @@
           </li>
         {{ end }}
       </ul>
-      </div>
     </div>
   </div>
 </section>

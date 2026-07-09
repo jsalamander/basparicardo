@@ -4,8 +4,10 @@
 {{ $isInterPair := eq $fontPair "anton-inter" }}
 {{ $displayClass := cond $isAntonPair "font-display-anton tracking-[0.06em]" (cond $isBarlowPair "font-display-barlow tracking-[0.08em]" "font-display-oswald tracking-[0.1em]") }}
 {{ $uiClass := cond $isInterPair "font-ui-inter" (cond (or $isAntonPair $isBarlowPair) "font-ui-manrope" "font-ui-sora") }}
+{{ $cardSurfaceClass := partial "card-surface-class.html" . }}
+{{ $eventNameFontClass := cond $isAntonPair "font-display-anton" (cond $isBarlowPair "font-display-barlow" "font-display-oswald") }}
 
-<section class="relative isolate flex min-h-screen touch-pan-y touch-manipulation items-start select-none">
+<section class="relative isolate flex min-h-screen touch-pan-y touch-manipulation items-start">
 
   <div class="relative z-20 mx-auto w-full max-w-6xl px-6 pb-16 pt-8 sm:px-10 sm:pt-10 md:pb-20 md:pt-12">
     <header class="mx-auto flex max-w-4xl justify-center">
@@ -23,20 +25,15 @@
       </h1>
     </div>
 
-    <div class="mx-auto mt-8 max-w-5xl relative p-4 sm:mt-10 sm:p-6 md:mt-12 md:p-8 {{ $uiClass }}">
-      <div class="pointer-events-none absolute inset-[10px] z-0 rounded-[1.55rem] bg-black/45"></div>
-      <div class="pointer-events-none absolute inset-0 z-10">
-        {{ partial "wavy-border.html" (dict "width" "100%" "height" "100%") }}
-      </div>
-      <div class="relative z-20 px-3 py-3 sm:px-4 sm:py-4 md:px-5 md:py-5">
-      <ul class="divide-y divide-[#fbf4c2]/15">
+    <div class="mx-auto mt-8 max-w-5xl {{ $uiClass }} sm:mt-10 md:mt-12">
+      <ul class="space-y-3 sm:space-y-4">
         {{ $now := now }}
         {{ $upcoming := where .Params.events "date" "ge" ($now.Format "2006-01-02") }}
         {{ range sort $upcoming "date" "asc" }}
           {{ $title := .title | default .name }}
-          <li class="grid grid-cols-1 items-end gap-2 py-4 text-[#fbf4c2] sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-8 sm:py-5">
-            <p class="text-center text-[clamp(1.15rem,3vw,1.75rem)] font-medium leading-tight tracking-[0.025em] [font-variant-numeric:tabular-nums] text-[#fbf4c2]/90 sm:text-left">{{ dateFormat "2 January 2006" .date }}</p>
-            <p class="text-center text-[clamp(1.45rem,4.6vw,2.7rem)] font-semibold leading-[0.96] tracking-[0.01em] sm:text-right">
+          <li class="{{ $cardSurfaceClass }} grid grid-cols-1 items-end gap-2 px-4 py-4 text-[#fbf4c2] sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-8 sm:px-5 sm:py-5">
+            <p class="{{ $uiClass }} text-center text-[clamp(1rem,2.4vw,1.35rem)] font-semibold uppercase leading-tight tracking-[0.035em] [font-variant-numeric:tabular-nums] text-[#fbf4c2]/82 sm:text-left">{{ dateFormat "2 January 2006" .date }}</p>
+            <p class="{{ $eventNameFontClass }} text-center text-[clamp(1.5rem,4.2vw,2.25rem)] leading-[0.96] tracking-[0.025em] text-[#fbf4c2] sm:text-right">
               {{ if .url }}
                 <a href="{{ .url }}" target="_blank" rel="noopener noreferrer" class="underline decoration-[#fbf4c2]/45 underline-offset-[0.22em] transition-colors hover:decoration-[#fbf4c2]">{{ $title }}</a>
               {{ else }}
@@ -46,29 +43,23 @@
           </li>
         {{ end }}
       </ul>
-      </div>
     </div>
 
     <div class="mx-auto mt-4 max-w-5xl text-right">
       <a href="{{ `past-shows` | relURL }}" class="{{ $uiClass }} text-sm tracking-[0.18em] uppercase text-[#fbf4c2]/60 hover:text-[#fbf4c2]/90 transition-colors">Past shows →</a>
     </div>
 
-    <div class="mx-auto mt-10 max-w-5xl">
-      <div class="relative px-6 py-8 text-center sm:px-10 sm:py-10">
-        <div class="pointer-events-none absolute inset-[10px] z-0 rounded-[1.55rem] bg-black/40"></div>
-        <div class="pointer-events-none absolute inset-0 z-10">
-          {{ partial "wavy-border.html" . }}
-        </div>
-        <div class="relative z-20 px-4 py-5 sm:px-5 sm:py-6">
-          <p class="{{ $uiClass }} text-xs uppercase tracking-[0.32em] text-[#fbf4c2]/50 mb-2">Booking</p>
-          <h2 class="{{ $displayClass }} text-3xl uppercase text-[#fbf4c2] mb-4 sm:text-4xl">Want to book us?</h2>
+    <div class="mx-auto mt-10 max-w-full md:max-w-lg lg:max-w-xl xl:max-w-2xl">
+      <div class="{{ $cardSurfaceClass }} px-6 py-9 text-center sm:px-12 sm:py-12 md:px-14 md:py-14">
+        <div class="px-2 py-2 sm:px-4 sm:py-3">
+          <h2 class="{{ $displayClass }} text-3xl uppercase text-[#fbf4c2] mb-4 sm:text-4xl">Book us</h2>
           <p class="{{ $uiClass }} text-sm text-[#fbf4c2]/60 mb-6 max-w-sm mx-auto">Get in touch and we'll get back to you as soon as possible.</p>
           <button
             id="booking-cta"
-            class="{{ $uiClass }} group inline-flex items-center gap-3 rounded-sm border border-[#fbf4c2]/30 px-6 py-3 text-sm uppercase tracking-[0.2em] text-[#fbf4c2] transition-all hover:border-[#fbf4c2]/70 hover:bg-[#fbf4c2]/5 active:scale-[0.97]"
+            class="{{ $uiClass }} group inline-flex items-center gap-3 rounded-md border border-[#fbf4c2]/55 bg-[#fbf4c2] px-6 py-3 text-sm uppercase tracking-[0.18em] text-[#14130f] shadow-[0_10px_26px_rgba(0,0,0,0.36)] transition-all duration-200 hover:bg-[#fff3b0] hover:border-[#fff3b0]/65 hover:shadow-[0_14px_30px_rgba(0,0,0,0.44)] active:scale-[0.98]"
             aria-label="Reveal booking email address"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 opacity-70" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 opacity-80" aria-hidden="true">
               <path d="M3 4a2 2 0 0 0-2 2v1.161l8.441 4.221a1.25 1.25 0 0 0 1.118 0L19 7.162V6a2 2 0 0 0-2-2H3z"/>
               <path d="m19 8.839-7.77 3.885a2.75 2.75 0 0 1-2.46 0L1 8.839V14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.839z"/>
             </svg>

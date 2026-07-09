@@ -4,6 +4,13 @@ module.exports = {
     "./layouts/**/*.html",
     "./themes/**/*.html",
   ],
+  safelist: [
+    "rounded-2xl",
+    "border",
+    "border-[#fbf4c2]/30",
+    "bg-[rgba(0,0,0,0.80)]",
+    "shadow-[0_14px_38px_rgba(0,0,0,0.44)]",
+  ],
   theme: {
     extend: {
       fontFamily: {
