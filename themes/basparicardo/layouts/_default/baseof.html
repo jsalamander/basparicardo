@@ -19,12 +19,201 @@
     <main class="relative isolate min-h-screen" data-contour-surface>
       {{ partial "contour-background.html" . }}
 
-      <div class="relative z-20">
+      {{ if or .IsHome (eq .File.BaseFileName "past-shows") }}
+        <header id="site-logo-header" class="relative z-30 mx-auto flex max-w-4xl justify-center px-6 pb-0 pt-8 sm:px-10 sm:pt-10 md:pt-12" aria-label="Site logo">
+          <img
+            id="site-logo-image"
+            class="h-auto w-full max-w-4xl"
+            src="{{ `image/Logo_Baspa_Schrift_end.svg` | relURL }}"
+            alt="{{ site.Title }}"
+          >
+        </header>
+      {{ end }}
+
+      <div class="relative z-20" data-page-content>
         {{ block "main" . }}{{ end }}
-        {{ partial "footer.html" . }}
       </div>
+
+      {{ partial "footer.html" . }}
     </main>
     <script src="{{ `js/vendor/gsap.min.js` | relURL }}" defer></script>
     <script src="{{ `js/contour-lift.js` | relURL }}" defer></script>
+    <script>
+      (function () {
+        var button = document.getElementById('hide-text-toggle');
+        var contentRoots = Array.prototype.slice.call(document.querySelectorAll('[data-page-content]'));
+        var hideIcon = button ? button.querySelector('[data-hide-icon]') : null;
+        var showIcon = button ? button.querySelector('[data-show-icon]') : null;
+        var logoHeader = document.getElementById('site-logo-header');
+        var logoImage = document.getElementById('site-logo-image');
+        var mobileQuery = window.matchMedia('(hover: none) and (pointer: coarse)');
+        var lockedScrollY = -1;
+        var preHideScrollY = 0;
+
+        if (!button || contentRoots.length === 0) {
+          return;
+        }
+
+        function lockScroll(restoreY) {
+          if (document.body.classList.contains('overflow-hidden')) {
+            return;
+          }
+
+          var freezeY = window.scrollY || 0;
+          lockedScrollY = typeof restoreY === 'number' ? restoreY : freezeY;
+          document.documentElement.classList.add('overflow-hidden');
+          document.body.classList.add('overflow-hidden', 'touch-none', 'fixed', 'inset-x-0', 'w-full');
+          document.body.style.top = '-' + freezeY + 'px';
+        }
+
+        function unlockScroll() {
+          if (!document.body.classList.contains('overflow-hidden')) {
+            return false;
+          }
+
+          document.documentElement.classList.remove('overflow-hidden');
+          document.body.classList.remove('overflow-hidden', 'touch-none', 'fixed', 'inset-x-0', 'w-full');
+          document.body.style.top = '';
+
+          if (lockedScrollY >= 0) {
+            window.scrollTo(0, lockedScrollY);
+          }
+          lockedScrollY = -1;
+          return true;
+        }
+
+        function setHidden(hidden) {
+          if (hidden) {
+            preHideScrollY = window.scrollY || 0;
+            if (preHideScrollY > 0) {
+              window.scrollTo(0, 0);
+            }
+          }
+
+          contentRoots.forEach(function (root) {
+            root.classList.toggle('hidden', hidden);
+          });
+          document.body.classList.toggle('content-hidden', hidden);
+
+          if (logoHeader) {
+            logoHeader.classList.toggle('pt-3', hidden);
+            logoHeader.classList.toggle('pt-8', !hidden);
+            logoHeader.classList.toggle('sm:pt-4', hidden);
+            logoHeader.classList.toggle('sm:pt-10', !hidden);
+            logoHeader.classList.toggle('md:pt-6', hidden);
+            logoHeader.classList.toggle('md:pt-12', !hidden);
+            logoHeader.classList.toggle('max-w-2xl', hidden);
+            logoHeader.classList.toggle('max-w-4xl', !hidden);
+          }
+
+          if (logoImage) {
+            logoImage.classList.toggle('max-h-[28vh]', hidden);
+            logoImage.classList.toggle('sm:max-h-[34vh]', hidden);
+            logoImage.classList.toggle('w-auto', hidden);
+            logoImage.classList.toggle('w-full', !hidden);
+            logoImage.classList.toggle('max-w-full', hidden);
+            logoImage.classList.toggle('object-contain', hidden);
+            logoImage.classList.toggle('mx-auto', hidden);
+            logoImage.classList.toggle('max-w-4xl', !hidden);
+          }
+
+          button.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+          button.setAttribute('aria-label', hidden ? 'Show text content' : 'Hide text content');
+          if (hideIcon) {
+            hideIcon.classList.toggle('hidden', hidden);
+          }
+          if (showIcon) {
+            showIcon.classList.toggle('hidden', !hidden);
+          }
+
+          if (mobileQuery.matches && hidden) {
+            lockScroll(preHideScrollY);
+          } else {
+            var didUnlock = unlockScroll();
+            if (!hidden && !didUnlock && preHideScrollY > 0) {
+              window.scrollTo(0, preHideScrollY);
+            }
+            if (!hidden) {
+              preHideScrollY = 0;
+            }
+          }
+
+          window.dispatchEvent(new CustomEvent('baspa:text-hidden-change', {
+            detail: { hidden: hidden }
+          }));
+        }
+
+        setHidden(false);
+
+        button.addEventListener('click', function () {
+          var isHidden = contentRoots[0].classList.contains('hidden');
+          var nextHidden = !isHidden;
+          setHidden(nextHidden);
+        });
+      })();
+
+      (function () {
+        var footer = document.querySelector('[data-scroll-footer]');
+        var lastY = window.scrollY || 0;
+        var ticking = false;
+        var delta = 6;
+
+        if (!footer) {
+          return;
+        }
+
+        function setVisible(visible) {
+          footer.classList.toggle('translate-y-full', !visible);
+          footer.classList.toggle('opacity-0', !visible);
+          footer.classList.toggle('pointer-events-none', !visible);
+        }
+
+        function updateFooter() {
+          ticking = false;
+
+          if (document.body.classList.contains('content-hidden')) {
+            setVisible(true);
+            lastY = window.scrollY || 0;
+            return;
+          }
+
+          var currentY = window.scrollY || 0;
+          var change = currentY - lastY;
+
+          if (currentY <= 4) {
+            setVisible(false);
+            lastY = currentY;
+            return;
+          }
+
+          if (change > delta) {
+            setVisible(true);
+          } else if (change < -delta) {
+            setVisible(false);
+          }
+
+          lastY = currentY;
+        }
+
+        window.addEventListener('scroll', function () {
+          if (!ticking) {
+            window.requestAnimationFrame(updateFooter);
+            ticking = true;
+          }
+        }, { passive: true });
+
+        window.addEventListener('baspa:text-hidden-change', function (event) {
+          if (event && event.detail && event.detail.hidden) {
+            setVisible(true);
+            return;
+          }
+
+          setVisible(false);
+          lastY = window.scrollY || 0;
+        });
+
+        setVisible(false);
+      })();
+    </script>
   </body>
 </html>

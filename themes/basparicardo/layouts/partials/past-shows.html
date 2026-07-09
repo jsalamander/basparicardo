@@ -10,39 +10,33 @@
 <section class="relative isolate flex min-h-screen touch-pan-y touch-manipulation items-start">
 
   <div class="relative z-20 mx-auto w-full max-w-6xl px-6 pb-16 pt-8 sm:px-10 sm:pt-10 md:pb-20 md:pt-12">
-    <header class="mx-auto flex max-w-4xl justify-center">
-      <img
-        class="h-auto w-full"
-        src="{{ `image/Logo_Baspa_Schrift_end.svg` | relURL }}"
-        alt="{{ .Title }}"
-      >
-    </header>
+    <div data-page-content>
+      <div class="mx-auto mt-6 max-w-4xl text-center sm:mt-8 md:mt-10">
+        <p class="{{ $uiClass }} text-xs font-medium uppercase tracking-[0.32em] text-[#fbf4c2]/70 sm:text-sm">Archive</p>
+        <h1 class="{{ $displayClass }} text-5xl uppercase leading-[0.95] text-[#fbf4c2] sm:text-6xl md:text-7xl">
+          {{ .Title }}
+        </h1>
+      </div>
 
-    <div class="mx-auto mt-6 max-w-4xl text-center sm:mt-8 md:mt-10">
-      <p class="{{ $uiClass }} text-xs font-medium uppercase tracking-[0.32em] text-[#fbf4c2]/70 sm:text-sm">Archive</p>
-      <h1 class="{{ $displayClass }} text-5xl uppercase leading-[0.95] text-[#fbf4c2] sm:text-6xl md:text-7xl">
-        {{ .Title }}
-      </h1>
-    </div>
-
-    <div class="mx-auto mt-8 max-w-5xl {{ $uiClass }} sm:mt-10 md:mt-12">
-      <ul class="space-y-3 sm:space-y-4">
-        {{ $now := now }}
-        {{ $pastEvents := where .Site.Home.Params.events "date" "lt" ($now.Format "2006-01-02") }}
-        {{ range sort $pastEvents "date" "desc" }}
-          {{ $title := .title | default .name }}
-          <li class="{{ $cardSurfaceClass }} grid grid-cols-1 items-end gap-2 px-4 py-4 text-[#fbf4c2] sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-8 sm:px-5 sm:py-5">
-            <p class="{{ $uiClass }} text-center text-[clamp(1rem,2.4vw,1.35rem)] font-semibold uppercase leading-tight tracking-[0.035em] [font-variant-numeric:tabular-nums] text-[#fbf4c2]/82 sm:text-left">{{ dateFormat "2 January 2006" .date }}</p>
-            <p class="{{ $eventNameFontClass }} text-center text-[clamp(1.5rem,4.2vw,2.25rem)] leading-[0.96] tracking-[0.025em] text-[#fbf4c2] sm:text-right">
-              {{ if .url }}
-                <a href="{{ .url }}" target="_blank" rel="noopener noreferrer" class="underline decoration-[#fbf4c2]/45 underline-offset-[0.22em] transition-colors hover:decoration-[#fbf4c2]">{{ $title }}</a>
-              {{ else }}
-                {{ $title }}
-              {{ end }}
-            </p>
-          </li>
-        {{ end }}
-      </ul>
+      <div class="mx-auto mt-8 max-w-5xl {{ $uiClass }} sm:mt-10 md:mt-12">
+        <ul class="space-y-3 sm:space-y-4">
+          {{ $now := now }}
+          {{ $pastEvents := where .Site.Home.Params.events "date" "lt" ($now.Format "2006-01-02") }}
+          {{ range sort $pastEvents "date" "desc" }}
+            {{ $title := .title | default .name }}
+            <li class="{{ $cardSurfaceClass }} grid grid-cols-1 items-end gap-2 px-4 py-4 text-[#fbf4c2] sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-8 sm:px-5 sm:py-5">
+              <p class="{{ $uiClass }} text-center text-[clamp(1rem,2.4vw,1.35rem)] font-semibold uppercase leading-tight tracking-[0.035em] [font-variant-numeric:tabular-nums] text-[#fbf4c2]/82 sm:text-left">{{ dateFormat "2 January 2006" .date }}</p>
+              <p class="{{ $eventNameFontClass }} text-center text-[clamp(1.5rem,4.2vw,2.25rem)] leading-[0.96] tracking-[0.025em] text-[#fbf4c2] sm:text-right">
+                {{ if .url }}
+                  <a href="{{ .url }}" target="_blank" rel="noopener noreferrer" class="underline decoration-[#fbf4c2]/45 underline-offset-[0.22em] transition-colors hover:decoration-[#fbf4c2]">{{ $title }}</a>
+                {{ else }}
+                  {{ $title }}
+                {{ end }}
+              </p>
+            </li>
+          {{ end }}
+        </ul>
+      </div>
     </div>
   </div>
 </section>
